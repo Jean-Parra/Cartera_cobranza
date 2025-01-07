@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Reagendar: Lista de citas</title>
+</head>
+<body>
+    <nav class="navigation container">
+        <div class="navigation-to-left">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/list_users">
+                        <div class="navigation__option">
+                            <p>Lista de formato DS160</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/register_appointments">
+                        <div class="navigation__option">
+                            <p>Registrar usuario</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_appointments">
+                        <div class="navigation__option">
+                            <p>Lista de usuarios</p>
+                        </div>
+                    </a>
+                </li>
+
+                {% if current_user.ROL_ID == 1 %}
+                <li class="navigation__item">
+                    <a href="/list_people">
+                        <div class="navigation__option">
+                            <p>Lista de empleados</p>
+                        </div>
+                    </a>
+                </li>
+                
+                <li class="navigation__item">
+                    <a href="/register_people">
+                        <div class="navigation__option">
+                            <p>Registrar empleado</p>
+                        </div>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+        <div class="navigation-to-right">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/logout">
+                        <div class="navigation__option">
+                            <p>Cerrar sesion</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
+    <div class="container">
+        <h1 class="title">Lista de citas</h1>
+        <div class="table-responsive">
+            <!-- Filtro -->
+            <form method="GET" action="{{ url_for('list_appointments') }}">
+                <div class="form-group-inline">
+                    <label for="fecha_inicio">Fecha de inicio</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" placeholder="Fecha de inicio" class="form-card__input-inline-tree">
+                </div>
+                <div class="form-group-inline">
+                    <label for="fecha_fin">Fecha de fin</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" placeholder="Fecha de fin" class="form-card__input-inline-tree">
+                </div>
+                <div class="form-group-inline">
+                    <label for="correo">Buscar por correo</label>
+                    <input type="text" id="correo" name="correo" value="{{ correo }}" placeholder="Buscar por correo" class="form-card__input-inline-tree">
+                </div>
+                <div class="form-group-inline">
+                    <label for="tipo">Tipo</label>
+                    <select id="tipo" name="tipo" class="form-card__input-inline-tree">
+                        <option value="">Seleccionar tipo</option>
+                        <option value="tramites" {% if tipo == 'tramites' %}selected{% endif %}>Tramites</option>
+                        <option value="reagendamiento" {% if tipo == 'reagendamiento' %}selected{% endif %}>Reagendamiento</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn--green">Buscar</button>
+                <a href="{{ url_for('download_appointments', fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, correo=correo, tipo=tipo) }}" class="btn btn--blue">Descargar Excel</a>
+
+            </form>
+            
+            
+
+            <!-- Tabla de usuarios -->
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Correo</th>
+                        <th>Tipo</th>
+                        <th>Habilitado</th>
+                        <th>Fecha consular</th>
+                        <th>Fecha ASC</th>
+                        <th>Fecha vencimiento</th>
+                        <th>Fecha Creación</th>
+                        <th>Fecha Actualización</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in data %}
+                    <tr>
+                        <td data-label="ID">{{ user.ID }}</td>
+                        <td data-label="Correo">{{ user.CORREO }}</td>
+                        <td data-label="Tipo">{{ user.TIPO }}</td>
+                        <td data-label="Habilitado">{{ 'Sí' if user.HABILITADO else 'No' }}</td>
+                        <td data-label="Fecha consular">{{ user.FECHA_CONSULAR  if user.FECHA_CONSULAR else ''}}</td>
+                        <td data-label="Fecha ASC">{{ user.FECHA_ASC if user.FECHA_ASC else ''}}</td>
+                        <td data-label="Vencimiento consular">
+                            {% if user.HABILITADO %}
+                                {{ user.VENCIMIENTO if user.VENCIMIENTO else 'Múltiples fechas' }}
+                            {% else %}
+                                {{ user.VENCIMIENTO if user.VENCIMIENTO else '' }}
+                            {% endif %}
+                        </td>
+                        <td data-label="Fecha Creación">{{ user.FECHA_CREACION if user.FECHA_CREACION else ''}}</td>
+                        <td data-label="Fecha Actualización">{{ user.FECHA_ACTUALIZACION if user.FECHA_ACTUALIZACION else ''}}</td>
+
+                    </tr>
+                    {% endfor %}                          
+                </tbody>
+            </table>
+
+            <!-- Controles de Paginación -->
+            <div class="pagination">
+                {% if pagina_actual > 1 %}
+                    <a href="?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&correo={{ correo }}&tipo={{ tipo }}&pagina={{ pagina_actual - 1 }}">&laquo; Anterior</a>
+                {% endif %}
+                {% for pagina in paginas_visibles %}
+                    <a href="?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&correo={{ correo }}&tipo={{ tipo }}&pagina={{ pagina }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
+                {% endfor %}
+                {% if pagina_actual < total_paginas %}
+                    <a href="?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&correo={{ correo }}&tipo={{ tipo }}&pagina={{ pagina_actual + 1 }}">Siguiente &raquo;</a>
+                {% endif %}
+            </div>
+
+
+        </div>
+    </div>
+
+</body>
+</html>

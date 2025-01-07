@@ -1,0 +1,271 @@
+:root {
+    /*Colors*/
+    --accented-yellow: #fdc921;
+    --accented-red: #e80729;
+    --opaque-green: #1789fc;
+    --accented-green: #009929;
+
+    --inputs-bg: #f7f6fb;
+    --box-shadows: #e1e1e1;
+    --texts: #4e4e4e;
+    /*Font sizes*/
+    --sm: 1rem;
+    --md: 1.2rem;
+    --lg: 1.6rem;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0px;
+    padding: 0;
+}
+
+body {
+    font-family: Geneva, Verdana, sans-serif;
+}
+.flash-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+    padding: 10px;
+    border: 1px solid;
+    border-radius: 5px;
+}
+.container {
+    max-width: 1400px;
+    margin: 0px auto;
+}
+
+.title {
+    font-size: var(--lg);
+    color: var(--texts);
+    text-align: center;
+    margin-block: 8px;
+}
+
+.subtitle {
+    color: var(--texts);
+}
+
+.btn {
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 0.8em 1.2em;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-block: 16px;
+    min-width: max-content;
+    text-align: center;
+    text-decoration: none;
+    font-size: var(--sm);
+    transition: all 0.3s ease;
+}
+
+.btn--block {
+    display: block;
+    width: 100%;
+}
+
+.btn--green {
+    background-color: var(--opaque-green);
+    color: white;
+}
+
+.btn--green:hover {
+    background-color: var(--accented-yellow);
+    color: black;
+}
+
+.form-card {
+    /* width: clamp(240px, 60vw, 480px); */
+    margin: 0px auto;
+    border: 1px solid var(--box-shadows);
+    padding: 16px;
+    box-shadow: 1px 4px 16px var(--box-shadows);
+}
+
+.form-card__input-inline {
+    background-color: var(--inputs-bg);
+    border: 1px solid var(--box-shadows);
+    padding: 12px 8px;
+    outline: none;
+    display: inline-block;
+    width: calc(50% - 10px);
+}
+
+/* tres */
+.form-group-inline {
+    display: inline-block;
+    width: calc(22% - 10px);
+    margin-right: 10px;
+    box-sizing: border-box;
+}
+
+.form-group-inline label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-card__input-inline-tree {
+    background-color: var(--inputs-bg);
+    border: 1px solid var(--box-shadows);
+    padding: 12px 8px;
+    outline: none;
+    width: 100%;
+}
+
+
+.form-card__subtitle {
+    font-size: 1.2rem;
+}
+
+.form-card__subtitle:not(:nth-child(1)) {
+    margin-block: 32px;
+}
+
+.form-card__subtitle:nth-child(1) {
+    margin-block-end: 32px;
+}
+
+.form-card__group,
+.form-group {
+    margin-block-end: 16px;
+}
+
+.form-card__error {
+    display: none;
+    color: var(--accented-red);
+    font-size: var(--sm);
+    margin-block: 8px;
+    text-align: justify;
+}
+
+.form-card__error_flask {
+    display: block;
+    color: var(--accented-red);
+    font-size: var(--sm);
+    margin-block: 8px;
+    text-align: justify;
+}
+
+.form-card__group--incorrect .form-card__error,
+.form-card__error--visible {
+    display: block;
+}
+
+.form-card__good--visible {
+    display: block;
+}
+.form-card__good {
+    display: none;
+    color: var(--accented-green);
+    font-size: var(--sm);
+    margin-block: 8px;
+    text-align: justify;
+}
+
+
+.form-card__good_flask {
+    display: block;
+    color: var(--accented-green);
+    font-size: var(--sm);
+    margin-block: 8px;
+    text-align: justify;
+}
+
+
+.form-card__label,
+.form__label {
+    display: block;
+    margin-block: 8px;
+}
+
+.form-card__input,
+.form__input {
+    width: 100%;
+    background-color: var(--inputs-bg);
+    border: 1px solid var(--box-shadows);
+    padding: 12px 8px;
+    outline: none;
+}
+
+.form-card__input--login {
+    position: relative;
+}
+
+.form-card__input-icon {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+}
+
+.form-card__input--login input {
+    padding-left: 40px;
+}
+
+.form-card__input::placeholder {
+    color: var(--texts);
+    font-weight: bold;
+}
+
+.form-card__redirection {
+    float: right;
+    display: block;
+    margin-block: 16px;
+    color: var(--texts);
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 0.8rem;
+    text-align: justify;
+}
+
+.form-card__buttons {
+    display: flex;
+    justify-content: space-evenly;
+    flex-wrap: wrap;
+}
+
+
+.cl {
+    clear: both;
+}
+
+
+@media screen and (max-width: 1400px) {
+    body {
+        padding-inline: 16px;
+    }
+}
+
+
+
+@media screen and (max-width: 768px) {
+    /*Font sizes*/
+    :root {
+        --sm: 0.8rem;
+        --md: 1rem;
+        --lg: 1.4rem;
+    }
+}
+
+
+@media screen and (max-width: 320px) {
+    /*Font sizes*/
+    :root {
+        --sm: 0.6rem;
+        --md: 0.8rem;
+        --lg: 1.2rem;
+    }
+
+}
+
+.visible {
+    display: block;
+}
+
+.invisible {
+    display: none;
+}

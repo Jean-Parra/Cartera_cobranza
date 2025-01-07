@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Reagendar: Lista de mora</title>
+</head>
+<body>
+    <nav class="navigation container">
+        <div class="navigation-to-left">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/list_users">
+                        <div class="navigation__option">
+                            <p>Lista de usuarios</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/register_user">
+                        <div class="navigation__option">
+                            <p>Registrar usuario</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_mora">
+                        <div class="navigation__option">
+                            <p>Correos de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_all_pagos">
+                        <div class="navigation__option">
+                            <p>Filtro de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
+                <li class="navigation__item">
+                    <a href="/register_employee">
+                        <div class="navigation__option">
+                            <p>Registrar  empleados</p>
+                        </div>
+                    </a>
+                </li>
+                {% endif %}
+                
+
+    
+            </ul>
+        </div>
+        <div class="navigation-to-right">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/logout">
+                        <div class="navigation__option">
+                            <p>Cerrar sesion</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
+    <div class="container">
+        <h1 class="title">Lista de pagos</h1>
+            <input type="hidden" name="csrf_token" value ="{{ csrf_token() }}" />      
+
+            <button onclick="sendEmails()" style="background: none; border: none; cursor: pointer; display: flex; align-items: center;">
+                <img src="../static/icons/envelope.svg" alt="Enviar correos" class="icon" style="margin-right: 8px;" />
+                Enviar correos seleccionados
+            </button>
+            
+            <p id="global-status"></p> <!-- Este es el elemento que se actualiza -->
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Seleccionar</th>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Cuota</th>
+                        <th>Fecha programada</th>
+                        <th>Fecha pago</th>
+                        <th>Monto</th>
+                        <th>Abono capital</th>
+                        <th>Abono intereses</th>
+                        <th>Estado</th>
+                        <th>Días mora</th>
+                        <th>Agregar pago</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in data %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="select-pago" value="{{ user.id_pago }}">
+                        </td>
+                        <td data-label="ID">{{ user.id_pago }}</td>
+                        <td data-label="Correo">{{ user.nombre_completo }}</td>
+                        <td data-label="Cuotas">{{ user.numero_cuota }}</td>
+                        <td data-label="Cuotas">{{ user.fecha_pago_programada }}</td>
+                        <td data-label="Cuotas">{{ user.fecha_pago_real or ""}}</td>
+                        
+                        <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.monto_cuota) | replace(',', '.') }}</td>
+                        <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.abono_capital) | replace(',', '.') }}</td>
+                        <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.abono_intereses) | replace(',', '.') }}</td>
+                        <td data-label="Cuotas">{{ user.nombre_estado }}</td>   
+                        <td data-label="dias mora">{{user.dias_mora}}</td> 
+                        <td data-label="Pago" data-id="{{ user.id_pago }}">
+                            <a href="{{ url_for('payment', id=user.id_pago) }}">
+                                <img src="../static/icons/cash-coin.svg" alt="cash icon" class="icon" />
+                            </a>
+                        </td>
+                        
+
+                    </tr>
+                    {% endfor %}                          
+                </tbody>
+            </table>
+
+            <style>
+                .notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 25px;
+                    border-radius: 4px;
+                    color: white;
+                    font-weight: 500;
+                    z-index: 1000;
+                    animation: slideIn 0.5s ease-in-out;
+                }
+                
+                .notification.success {
+                    background-color: #4CAF50;
+                }
+                
+                .notification.error {
+                    background-color: #f44336;
+                }
+                
+                .email-button {
+                    background: none;
+                    border: none;
+                    padding: 0;
+                    cursor: pointer;
+                }
+                
+                .email-button:hover {
+                    opacity: 0.8;
+                }
+                
+                @keyframes slideIn {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                </style>
+                
+                <div id="notification" class="notification" style="display: none;"></div>
+                
+                <script>
+                    // Función para enviar correos múltiples
+                    async function sendEmails() {
+                        const checkboxes = document.querySelectorAll('input[name="select-pago"]:checked');
+                        const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
+
+                        if (selectedIds.length === 0) {
+                            alert("Por favor, selecciona al menos un pago para enviar el correo.");
+                            return;
+                        }
+
+                        const statusElement = document.getElementById("global-status");
+                        statusElement.textContent = "Enviando correos...";
+                        statusElement.style.color = "blue";
+
+                        try {
+                            const response = await fetch('/send_multiple_emails', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                                },
+                                body: JSON.stringify({ ids: selectedIds })
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+
+                            const contentType = response.headers.get("content-type");
+                            if (!contentType || !contentType.includes("application/json")) {
+                                throw new Error("La respuesta no es JSON válido");
+                            }
+
+                            const data = await response.json();
+                            statusElement.textContent = `Correos enviados: ${data.total_enviados} de ${selectedIds.length}`;
+                            statusElement.style.color = "green";
+
+                        } catch (error) {
+                            console.error("Error:", error);
+                            statusElement.textContent = "Error: Sesión expirada o servidor no disponible";
+                            statusElement.style.color = "red";
+                        }
+                    }
+
+
+                </script>
+
+            <!-- Controles de Paginación -->
+            <div class="pagination">
+                {% if pagina_actual > 1 %}
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual - 1 }}">&laquo; Anterior</a>
+                {% endif %}
+                {% for pagina in paginas_visibles %}
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
+                {% endfor %}
+                {% if pagina_actual < total_paginas %}
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual + 1 }}">Siguiente &raquo;</a>
+                {% endif %}
+            </div>
+
+
+        </div>
+    </div>
+
+</body>
+</html>

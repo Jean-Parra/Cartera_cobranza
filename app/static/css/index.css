@@ -1,0 +1,30 @@
+.container {
+    display: flex;
+    align-items: flex-start;
+}
+
+.personal-info {
+    flex: 2;
+    margin-right: 20px;
+    padding: 20px;
+}
+
+.personal-info h1, .personal-info h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 10px; /* Agrega un espacio entre el h1 y el h2 */
+}
+
+.personal-info li {
+    font-size: 18px;
+}
+
+.profile-image {
+    flex: 1;
+}
+
+.profile-image img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+}

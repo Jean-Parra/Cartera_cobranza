@@ -1,0 +1,35 @@
+# Ignora el archivo de configuración del entorno
+.env
+
+# Ignora los archivos de bytecode de Python
+__pycache__/
+*.py[cod]
+
+# Ignora los archivos de construcción (generalmente creados por setuptools o pip)
+build/
+dist/
+
+# Ignora los archivos de registro
+*.log
+
+# Ignora los archivos de la base de datos SQLite si estás utilizando SQLite
+*.sqlite
+
+# Ignora directorios de entorno virtual (si estás utilizando virtualenv o venv)
+venv/
+ENV/
+env/
+
+# Ignora los archivos de configuración de IDEs
+.idea/
+.vscode/
+
+# Ignora los archivos de configuración específicos de MacOS
+.DS_Store
+
+# Ignora los archivos de configuración específicos de Windows
+Thumbs.db
+
+# Ignora la carpeta trunk si estás usando Subversion o si es una carpeta de desarrollo
+trunk/
+.trunk

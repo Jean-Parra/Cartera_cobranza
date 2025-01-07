@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es" data-lt-installed="true">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
+
+    <title>Reagendar: Registro de usuarios</title>
+</head>
+
+<body>
+    <nav class="navigation container">
+        <div class="navigation-to-left">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/list_users">
+                        <div class="navigation__option">
+                            <p>Lista de usuarios</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/register_user">
+                        <div class="navigation__option">
+                            <p>Registrar usuario</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_mora">
+                        <div class="navigation__option">
+                            <p>Correos de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_all_pagos">
+                        <div class="navigation__option">
+                            <p>Filtro de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
+                <li class="navigation__item">
+                    <a href="/register_employee">
+                        <div class="navigation__option">
+                            <p>Registrar  empleados</p>
+                        </div>
+                    </a>
+                </li>
+                {% endif %}
+
+    
+            </ul>
+        </div>
+        <div class="navigation-to-right">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/logout">
+                        <div class="navigation__option">
+                            <p>Cerrar sesion</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
+    <div class="container">
+
+        <h1 class="title">Registro de credito</h1>
+
+        <form class="form-card" id="register-form" method="post" action="{{ url_for('register_credito', id=id_usuario) }}">
+            <input type="hidden" name="csrf_token" value ="{{ csrf_token() }}"  />          
+
+            <h2 class="form-card__subtitle">Usuario</h2>
+
+            <input type="hidden" name="id_usuario" value="{{ id_usuario }}">
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="full_name">Nombre completo:</label>
+                <input 
+                    class="form-card__input" 
+                    type="text" 
+                    name="full_name" 
+                    id="full_name" 
+                    placeholder="Nombre completo"
+                    value="{{ nombre_completo }}" 
+                    readonly>
+            </div>
+
+            <h2 class="form-card__subtitle">Datos de credito</h2>
+
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="amount">Monto:</label>
+                <input
+                    class="form-card__input"
+                    type="text"
+                    name="amount"
+                    id="amount"
+                    placeholder="Ingrese el monto"
+                    oninput="validateNumericInput(this)"
+                >
+                <p class="form-card__error">*Ingrese un número válido.</p>
+            </div>
+            
+            <div class="form-card__group">
+                <label class="form-card__label" for="interest-rate">Tasa de interés:</label>
+                <input 
+                    class="form-card__input" 
+                    type="text"
+                    name="interest_rate" 
+                    id="interest_rate" 
+                    placeholder="Ingrese la tasa de interés" 
+                    oninput="validateInterestRateInput(this)"
+                >
+                <p class="form-card__error">
+                    *La tasa de interés debe ser un número decimal válido.
+                </p>
+            </div>
+            
+            <script>
+                // Función que elimina cualquier caracter no numérico a medida que el usuario escribe
+                function validateNumericInput(input) {
+                    // Eliminar todo lo que no sea número
+                    input.value = input.value.replace(/\D/g, ''); // Elimina todo lo que no sea número
+                }
+            
+                // Función especial para permitir coma en la tasa de interés
+                function validateInterestRateInput(input) {
+                    // Paso 1: Reemplazar el punto por coma, si se encuentra
+                    input.value = input.value.replace('.', ',');
+            
+                    // Paso 2: Permitir solo un número de coma
+                    if ((input.value.match(/,/g) || []).length > 1) {
+                        // Si hay más de una coma, eliminar la última
+                        input.value = input.value.replace(/,([^,]*)$/, '$1');
+                    }
+            
+                    // Paso 3: Eliminar cualquier otro caracter no numérico
+                    input.value = input.value.replace(/[^0-9,]/g, ''); // Elimina caracteres no numéricos, exceptuando la coma
+                }
+            
+                // Función para prevenir caracteres no numéricos en los campos
+                function preventInvalidChars(e) {
+                    if (
+                        e.key === 'e' ||
+                        e.key === 'E' ||
+                        e.key === '-' ||
+                        e.key === '+' ||
+                        e.key === '.'
+                    ) {
+                        e.preventDefault(); // Previene la entrada de estos caracteres
+                    }
+                }
+            
+                // Agregar el listener a ambos campos
+                document.getElementById('amount').addEventListener('keydown', preventInvalidChars);
+                document.getElementById('interest_rate').addEventListener('keydown', preventInvalidChars);
+            </script>
+            
+            
+            <div class="form-card__group">
+                <label class="form-card__label" for="installments">Número de cuotas:</label>
+                <input class="form-card__input" type="number" name="installments" id="installments" placeholder="Ingrese el número de cuotas">
+                <p class="form-card__error">
+                    *El número de cuotas debe ser un entero positivo.
+                </p>
+            </div>
+            
+            <div class="form-card__group">
+                <label class="form-card__label" for="modalidad">Modalidad:</label>
+                <select class="form-card__input" name="modalidad" id="modalidad">
+                    <option value="" disabled selected>Seleccione una modalidad</option>
+
+                    {% for modalidad in modalidades %}
+                    <option value="{{modalidad.id_modalidad}}">{{modalidad.nombre_modalidad}}</option>
+                    {% endfor %}
+                </select>
+                <p class="form-card__error">
+                    *Debe seleccionar una modalidad.
+                </p>
+            </div>
+            
+            <div class="form-card__group">
+                <label class="form-card__label" for="date_start">Inicio de cuota:</label>
+                <input type="date" class="form-card__input" name="date_start" id="date_start" placeholder="Inicio de cuota">
+                <p class="form-card__error">
+                    *Debe seleccionar una fecha de inicio.
+                </p>
+            </div>
+
+            <h2 class="form-card__subtitle">Información dinámica</h2>
+
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="profit">Ganancia:</label>
+                <input class="form-card__input" type="text" name="profit" id="profit" placeholder="Ganancia" readonly>
+            </div>
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="valor_cuota">Valor cuota:</label>
+                <input class="form-card__input" type="text" name="valor_cuota" id="valor_cuota" placeholder="Valor cuota" readonly>
+            </div>
+            
+
+
+            <div class="cl"></div>
+            <div class="form-card__buttons">
+                <button class="btn btn--green btn--block" type="submit">Crear credito</button>
+            </div>
+            <div id="alerta" class="form-card__error {% if mostrar_alerta %}visible{% else %}invisible{% endif %}">
+                Error al registrar credito.
+            </div>       
+            
+            <div class="form-card__good {% if mostrar_exito %}visible{% else %}invisible{% endif %}">
+                Credito registrado exitosamente.
+            </div>  
+
+            <p class="form-card__error" id="form-error">
+                Rellene todos los campos del formulario correctamente antes de realizar el envío.
+            </p>
+        </form>
+    </div>
+    <script src="{{ url_for('static', filename='js/registrar_credito.js') }}" type="module"></script>
+
+
+
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Reagendar: Lista de empleados</title>
+</head>
+<body>
+    <nav class="navigation container">
+        <div class="navigation-to-left">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/list_users">
+                        <div class="navigation__option">
+                            <p>Lista de usuarios</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/register_user">
+                        <div class="navigation__option">
+                            <p>Registrar usuario</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_mora">
+                        <div class="navigation__option">
+                            <p>Correos de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_all_pagos">
+                        <div class="navigation__option">
+                            <p>Filtro de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
+                <li class="navigation__item">
+                    <a href="/register_employee">
+                        <div class="navigation__option">
+                            <p>Registrar  empleados</p>
+                        </div>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+        <div class="navigation-to-right">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/logout">
+                        <div class="navigation__option">
+                            <p>Cerrar sesion</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
+    <div class="container">
+        <h1 class="title">Historial de cambios</h1>
+        <div class="table-responsive">            
+            <!-- Tabla de usuarios -->
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Correo</th>
+                        <th>Tabla</th>
+                        <th>Operación</th>
+                        <th>Cambios</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for history, administrador_correo in histories %}
+                    <tr>
+                        <td>{{ administrador_correo }}</td>
+                        <td>{{ history.tabla_afectada }}</td>
+                        <td>{{ history.tipo_operacion }}</td>
+                        <td>
+                            <!-- Mostrar los cambios de manera más legible -->
+                            <ul>
+                                {% for key, value in history.cambios.items() %}
+                                <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td>{{ history.fecha_cambio }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    
+</body>
+</html>
+
+</body>
+</html>

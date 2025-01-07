@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Reagendar: Lista de citas</title>
+</head>
+<body>
+    <nav class="navigation container">
+        <div class="navigation-to-left">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/list_users">
+                        <div class="navigation__option">
+                            <p>Lista de usuarios</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/register_user">
+                        <div class="navigation__option">
+                            <p>Registrar usuario</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_mora">
+                        <div class="navigation__option">
+                            <p>Correos de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_all_pagos">
+                        <div class="navigation__option">
+                            <p>Filtro de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
+                <li class="navigation__item">
+                    <a href="/register_employee">
+                        <div class="navigation__option">
+                            <p>Registrar  empleados</p>
+                        </div>
+                    </a>
+                </li>
+                {% endif %}
+       
+                
+
+    
+            </ul>
+        </div>
+        <div class="navigation-to-right">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/logout">
+                        <div class="navigation__option">
+                            <p>Cerrar sesion</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
+    <div class="container">
+        <h1 class="title">Lista de pagos</h1>
+    
+        <!-- Filtros -->
+        <form method="GET" action="">
+            <div class="filters">
+                <label for="filtro_usuario">Usuario:</label>
+                <input type="text" id="filtro_usuario" name="filtro_usuario" value="{{ filtro_usuario }}">
+                
+                <label for="filtro_estado">Estado:</label>
+                <select id="filtro_estado" name="filtro_estado">
+                    <option value="">Todos</option>
+                    <option value="pagado" {% if filtro_estado == 'pagado' %}selected{% endif %}>Pagado</option>
+                    <option value="pendiente" {% if filtro_estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                    <option value="vencido" {% if filtro_estado == 'vencido' %}selected{% endif %}>Vencido</option>
+                </select>
+                
+                <button type="submit">Filtrar</button>
+            </div>
+        </form>
+    
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Cuota</th>
+                    <th>Fecha programada</th>
+                    <th>Fecha pago</th>
+                    <th>Monto</th>
+                    <th>Abono capital</th>
+                    <th>Abono intereses</th>
+                    <th>Estado</th>
+                    <th>Días mora</th>
+                    <th>Agregar pago</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in data %}
+                <tr>
+                    <td>{{ user.id_pago }}</td>
+                    <td>{{ user.nombre_completo }}</td>
+                    <td>{{ user.numero_cuota }}</td>
+                    <td>{{ user.fecha_pago_programada }}</td>
+                    <td>{{ user.fecha_pago_real or "" }}</td>
+                    <td>{{ '{:,.0f}'.format(user.monto_cuota) | replace(',', '.') }}</td>
+                    <td>{{ '{:,.0f}'.format(user.abono_capital) | replace(',', '.') }}</td>
+                    <td>{{ '{:,.0f}'.format(user.abono_intereses) | replace(',', '.') }}</td>
+                    <td>{{ user.nombre_estado }}</td>
+                    <td>{{ user.dias_mora }}</td>
+                    <td>
+                        <a href="{{ url_for('payment', id=user.id_pago) }}">
+                            <img src="../static/icons/cash-coin.svg" alt="cash icon" class="icon" />
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    
+        <!-- Controles de Paginación -->
+        <div class="pagination">
+            {% if pagina_actual > 1 %}
+                <a href="?pagina={{ pagina_actual - 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}">&laquo; Anterior</a>
+            {% endif %}
+            {% for pagina in paginas_visibles %}
+                <a href="?pagina={{ pagina }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
+            {% endfor %}
+            {% if pagina_actual < total_paginas %}
+                <a href="?pagina={{ pagina_actual + 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}">Siguiente &raquo;</a>
+            {% endif %}
+        </div>
+    </div>
+    
+
+    <!-- Modal -->
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <p class="form-card__label">¿Estás seguro de que deseas eliminar el credito <span id="nombreEliminar"></span>?</p>
+            <div class="form-card__buttons">
+                <button id="confirmar-eliminar" class="btn btn--green" type="submit">Confirmar</button>
+                <button id="cancelar-eliminar" class="btn btn--green" type="submit">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/modal_credito.js') }}" type="module"></script>
+
+</body>
+</html>

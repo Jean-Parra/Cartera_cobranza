@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}" />
+    <title>Reagendar: Restablecer contraseña</title>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="title">Nueva contraseña</h1>
+     
+        <form class="form-card" id="login-form" method="post" action="{{ url_for('reset_with_token', token=token) }}">
+            <input type="hidden" name="csrf_token" value ="{{ csrf_token() }}"  />  
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="password">Contraseña:</label>
+                <input class="form-card__input" type="password" name="password" id="password" placeholder="Contraseña">
+                <p class="form-card__error">
+                    *La contraseña debe tener al menos 8 caracteres, una letra, un número y uno de los siguientes caracteres especiales: $ ! % * # ? & / % @
+                </p>
+            </div>
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="password-2">Confirmación de contraseña:</label>
+                <input class="form-card__input" type="password" name="password-2" id="password-2" placeholder="Repita la contraseña">
+                <p class="form-card__error">Ambas contraseñas deben ser iguales.</p>
+            </div>
+
+            <div class="cl"></div>
+            <div class="form-card__buttons">
+                <button class="btn btn--green btn--block" type="submit">Cambiar contraseña</button>
+            </div>
+
+            <p class="form-card__error" id="form-error">
+                Rellene todos los campos del formulario correctamente antes de realizar el envío.
+            </p>
+        </form>
+    </div>
+    <script src="{{ url_for('static', filename='js/reset_with_password.js') }}" type="module"></script>
+
+
+</body>
+</html>
