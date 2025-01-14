@@ -44,6 +44,13 @@
                         </div>
                     </a>
                 </li>
+                <li class="navigation__item">
+                    <a href="/list_all_credito">
+                        <div class="navigation__option">
+                            <p>Filtro de creditos</p>
+                        </div>
+                    </a>
+                </li>
                 {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
                 <li class="navigation__item">
                     <a href="/register_employee">
@@ -100,9 +107,19 @@
 
     <div class="container">
         <h1 class="title">Lista de usuarios</h1>
+
+        <!-- Filtros -->
+        <form method="GET" action="">
+            <div class="filters">
+                <label for="filtro">Usuario:</label>
+                <input placeholder="Buscar usuario por nombre" type="text" id="filtro" name="filtro" value="{{ filtro }}" class="form-card__input-inline">
+                
+                <button type="submit" class="btn btn--green">Filtrar</button>
+            </div>
+        </form>
+
+
         <div class="table-responsive">
-            <!-- Filtro -->
-            <input type="text" id="filtro" placeholder="Buscar usuario por nombre o codigo" class="form-card__input-inline" value="{{filtro}}">
             
             <!-- Tabla de usuarios -->
             <table class="table">
@@ -132,8 +149,7 @@
                         <td data-label="Direccion">{{ user.direccion }}</td>
                         <td data-label="Celular">{{ user.celular }}</td>
                         <td data-label="Correo">{{ user.correo }}</td>
-
-                        <td data-label="Registrar credito" data-id="{{ user.id_usuario }}">
+                        <td data-label="Nuevo credito" data-id="{{ user.id_usuario }}">
                             <a href="{{ url_for('register_credito', id=user.id_usuario) }}">
                                 <img src="../static/icons/credit-card.svg" alt="card icon" class="icon" />
                             </a>
@@ -146,13 +162,13 @@
                             </a>
                         </td>
 
-                        <td data-label="Actualizar usuario" data-id="{{ user.id_usuario }}">
+                        <td data-label="Editar" data-id="{{ user.id_usuario }}">
                             <a href="{{ url_for('update_user', id=user.id_usuario) }}">
                                 <img src="../static/icons/pencil.svg" alt="Pencil icon" class="icon" />
                             </a>
                         </td>
 
-                        <td data-label="Historial de usuario" data-id="{{ user.id_usuario }}">
+                        <td data-label="Historial" data-id="{{ user.id_usuario }}">
                             <a href="{{ url_for('history_user', id=user.id_usuario) }}">
                                 <img src="../static/icons/clock-history.svg" alt="Pencil icon" class="icon" />
                             </a>
@@ -207,26 +223,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script> -->
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Obtén el elemento del filtro
-            const filtroInput = document.getElementById('filtro');
-    
-            // Agrega un listener para el evento 'keypress'
-            filtroInput.addEventListener('keypress', function (event) {
-                if (event.key === 'Enter') {
-                    applyFilter();
-                }
-            });
-        });
-    
-        function applyFilter() {
-            const filtro = document.getElementById('filtro').value;
-            const url = new URL(window.location.href);
-            url.searchParams.set('filtro', filtro);
-            window.location.href = url.href;
-        }
-    </script>
     
 </body>
 </html>

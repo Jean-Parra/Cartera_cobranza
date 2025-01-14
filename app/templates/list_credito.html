@@ -42,6 +42,13 @@
                         </div>
                     </a>
                 </li>
+                <li class="navigation__item">
+                    <a href="/list_all_credito">
+                        <div class="navigation__option">
+                            <p>Filtro de creditos</p>
+                        </div>
+                    </a>
+                </li>
                 {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
                 <li class="navigation__item">
                     <a href="/register_employee">
@@ -97,12 +104,12 @@
                 {% for user in data %}
                 <tr>
                     <td data-label="ID">{{ user.id_credito }}</td>
-                    <td data-label="Correo">{{ user.nombre_completo }}</td>
-                    <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.monto_credito) | replace(',', '.') }}</td>
-                    <td data-label="Tasa de Interés">{{ '{:,.2f}'.format(user.tasa_interes).replace('.', ',') }}</td>
-                    <td data-label="Tipo">{{ user.numero_cuotas }}</td>
-                    <td data-label="Tipo">{{ user.nombre_modalidad }}</td>
-                    <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.ganancia_total) | replace(',', '.') }}</td>
+                    <td data-label="Usuario">{{ user.nombre_completo }}</td>
+                    <td data-label="Credito">{{ '{:,.0f}'.format(user.monto_credito) | replace(',', '.') }}</td>
+                    <td data-label="Interes">{{ '{:,.2f}'.format(user.tasa_interes).replace('.', ',') }}</td>
+                    <td data-label="Cuotas">{{ user.numero_cuotas }}</td>
+                    <td data-label="Modalidad">{{ user.nombre_modalidad }}</td>
+                    <td data-label="Ganancia">{{ '{:,.0f}'.format(user.ganancia_total) | replace(',', '.') }}</td>
         
                     <td data-label="Fecha Credito">{{ user.fecha_credito if user.fecha_credito else ''}}</td>
                     <td data-label="Fecha Creación">{{ user.fecha_creacion if user.fecha_creacion else ''}}</td>

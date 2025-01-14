@@ -37,7 +37,7 @@ def check_db_connection(f):
 @check_db_connection
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+        return redirect(url_for("list_users"))
     
     mostrar_alerta = False
 
@@ -49,7 +49,7 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             # logging.info(f"Inicio de sesión exitoso: usuario {user.correo}")
-            return redirect(url_for("index"))
+            return redirect(url_for("list_users"))
             
         else:
             # logging.info(f"Inicio de sesión fallido, credenciales invalidas: usuario {user.correo}")
@@ -182,14 +182,6 @@ def payment(id):
     elif request.method == "GET":
         return render_template("payment.html", pago=pago,nombre_completo=nombre_completo)
     
-
-
-@app.route("/index")
-@check_db_connection
-@login_required
-def index():
-    # logging.info(f"Redirigio al index: usuario {current_user.correo}")
-    return render_template("index.html")
     
 
 @app.route("/register_credito/<int:id>", methods=["GET", "POST"])
@@ -613,7 +605,7 @@ def register_employee():
 def logout():
     logout_user()
     flash("Has cerrado sesión", "success")
-    return redirect(url_for("index"))
+    return redirect(url_for("login"))
 
 
 
@@ -968,6 +960,87 @@ def list_credito(id):
         ), 200
 
 
+@app.route("/list_all_credito", methods=["GET"])
+@check_db_connection
+@login_required
+def list_all_credito():
+    pagina_actual = request.args.get("pagina", default=1, type=int)
+    usuarios_por_pagina = 10
+    
+    filtro_usuario = request.args.get("filtro_usuario", "").strip()
+
+    try:
+        # Consulta para obtener el número total de registros
+        query_sql = db.session.query(
+            Creditos.id_credito,
+            Usuarios.nombre_completo,
+            Creditos.monto_credito,
+            Creditos.tasa_interes,
+            Creditos.numero_cuotas,
+            ModalidadesPago.nombre_modalidad,
+            Creditos.fecha_credito,
+            Creditos.fecha_creacion,
+            Creditos.fecha_actualizacion,
+            Creditos.ganancia_total,
+            Usuarios.id_usuario
+        ).join(
+            Usuarios, Creditos.id_usuario == Usuarios.id_usuario
+        ).join(
+            ModalidadesPago, Creditos.id_modalidad_pago == ModalidadesPago.id_modalidad
+        ).filter(
+            Creditos.habilitado == True  # Filtro para incluir solo los créditos habilitados
+        ).order_by(
+            Creditos.id_credito.asc()  # Ordenar por id_credito de menor a mayor
+        )
+        
+        # Aplicar filtros dinámicos
+        if filtro_usuario:
+            query_sql = query_sql.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
+            
+        # Calcular la suma total del monto de la cuota según el filtro
+        suma_monto = query_sql.with_entities(db.func.sum(Pagos.monto_cuota)).scalar() or 0
+
+
+        # Para obtener el total de usuarios
+        total_usuarios = query_sql.count()
+
+        # Cálculo de paginación
+        total_paginas = (total_usuarios - 1) // usuarios_por_pagina + 1
+        inicio = (pagina_actual - 1) * usuarios_por_pagina
+
+        # Consulta con paginación
+        users_paginados = query_sql.offset(inicio).limit(usuarios_por_pagina).all()
+
+        paginas_visibles = []
+        for pagina in range(max(1, pagina_actual - 2), min(total_paginas + 1, pagina_actual + 3)):
+            paginas_visibles.append(pagina)
+
+        return render_template(
+            "list_all_credito.html",
+            data=users_paginados,
+            pagina_actual=pagina_actual,
+            total_usuarios=total_usuarios,
+            total_paginas=total_paginas,
+            usuarios_por_pagina=usuarios_por_pagina,
+            paginas_visibles=paginas_visibles,
+            suma_monto=suma_monto
+        ), 200
+
+    except Exception as e:
+        print("Error al obtener los usuarios:", e)
+        # En caso de error, mostrar una página en blanco o una página de error
+        return render_template(
+            "list_all_credito.html",
+            data=[],
+            pagina_actual=pagina_actual,
+            total_usuarios=0,
+            total_paginas=0,
+            usuarios_por_pagina=usuarios_por_pagina,
+            paginas_visibles=[],
+            suma_monto=0
+        ), 200
+
+
 @app.route("/list_all_pagos", methods=["GET"])
 @check_db_connection
 @login_required
@@ -1005,6 +1078,9 @@ def list_all_pagos():
             query = query.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
         if filtro_estado:
             query = query.filter(EstadosDeuda.nombre_estado.ilike(f"%{filtro_estado}%"))
+            
+         # Calcular la suma total del monto de la cuota según el filtro
+        suma_monto = query.with_entities(db.func.sum(Pagos.monto_cuota)).scalar() or 0
 
         total_usuarios = query.count()
         total_paginas = (total_usuarios - 1) // usuarios_por_pagina + 1
@@ -1028,6 +1104,8 @@ def list_all_pagos():
             filtro_usuario=filtro_usuario,
             filtro_estado=filtro_estado,
             paginas_visibles=paginas_visibles,
+            suma_monto=suma_monto  # Pasar la suma a la plantilla
+
         ), 200
 
     except Exception as e:
@@ -1042,6 +1120,8 @@ def list_all_pagos():
             filtro_usuario=filtro_usuario,
             filtro_estado=filtro_estado,
             paginas_visibles=[],
+            suma_monto=suma_monto  # Pasar la suma a la plantilla
+
         ), 200
 
 
@@ -1050,28 +1130,42 @@ def list_all_pagos():
 @check_db_connection
 @login_required
 def history_user(id):
+    
     usuario_actual = Usuarios.query.get(id)
-
     if not usuario_actual:
         return "Usuario no encontrado", 404
     
+    pagina_actual = request.args.get("pagina", default=1, type=int)
+    usuarios_por_pagina = 10
     
-    histories = db.session.query(
-        Auditoria,
-        Administradores.correo
-    ).join(
-        Administradores, Administradores.id_administrador == Auditoria.id_administrador
-    ).filter(
-        Auditoria.id_usuario == id
-    ).all()
-    
-    if not histories:
-        return "No se encontraron registros de auditoría para este usuario", 404
-    print(histories)
+    try:
+        query = db.session.query(
+            Auditoria,
+            Administradores.correo
+        ).join(
+            Administradores, Administradores.id_administrador == Auditoria.id_administrador
+        ).filter(
+            Auditoria.id_usuario == id
+        )
+        
+        total_usuarios = query.count()
+        total_paginas = (total_usuarios - 1) // usuarios_por_pagina + 1
+        inicio = (pagina_actual - 1) * usuarios_por_pagina
+        users_paginados = query.offset(inicio).limit(usuarios_por_pagina).all()
+
+        paginas_visibles = [
+            pagina for pagina in range(
+                max(1, pagina_actual - 2),
+                min(total_paginas + 1, pagina_actual + 3)
+            )
+        ]
 
 
-    return render_template('history_user.html', histories=histories)
-    
+        return render_template('history_user.html', histories=users_paginados, pagina_actual=pagina_actual, paginas_visibles=paginas_visibles, total_paginas=total_paginas), 200
+    except Exception as e:
+        print("Error al obtener el historial:", e)
+        return render_template('history_user.html', histories=[],pagina_actual=pagina_actual, paginas_visibles=[], total_paginas=0), 200
+
 
 @app.route("/update_user/<int:id>", methods=["GET", "POST"])
 @check_db_connection

@@ -91,7 +91,7 @@ body {
     padding: 12px 8px;
     outline: none;
     display: inline-block;
-    width: calc(50% - 10px);
+    /* width: calc(50% - 10px); */
 }
 
 /* tres */

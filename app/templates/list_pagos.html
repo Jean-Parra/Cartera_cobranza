@@ -42,6 +42,13 @@
                         </div>
                     </a>
                 </li>
+                <li class="navigation__item">
+                    <a href="/list_all_credito">
+                        <div class="navigation__option">
+                            <p>Filtro de creditos</p>
+                        </div>
+                    </a>
+                </li>
                 {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
                 <li class="navigation__item">
                     <a href="/register_employee">
@@ -94,17 +101,16 @@
                     <tr>
     
                         <td data-label="ID">{{ user.id_pago }}</td>
-                        <td data-label="Correo">{{ user.nombre_completo }}</td>
-                        <td data-label="Cuotas">{{ user.numero_cuota }}</td>
-                        <td data-label="Cuotas">{{ user.fecha_pago_programada }}</td>
-                        <td data-label="Cuotas">{{ user.fecha_pago_real or ""}}</td>
-                        
-                        <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.monto_cuota) | replace(',', '.') }}</td>
-                        <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.abono_capital) | replace(',', '.') }}</td>
-                        <td data-label="Monto Crédito">{{ '{:,.0f}'.format(user.abono_intereses) | replace(',', '.') }}</td>
-                        <td data-label="Cuotas">{{ user.nombre_estado }}</td>   
-                        <td data-label="dias mora">{{user.dias_mora}}</td> 
-                        <td data-label="Pago" data-id="{{ user.id_pago }}">
+                        <td data-label="Usuario">{{ user.nombre_completo }}</td>
+                        <td data-label="Cuota">{{ user.numero_cuota }}</td>
+                        <td data-label="Fecha programada">{{ user.fecha_pago_programada }}</td>
+                        <td data-label="Fecha pago">{{ user.fecha_pago_real or ""}}</td>
+                        <td data-label="Monto">{{ '{:,.0f}'.format(user.monto_cuota) | replace(',', '.') }}</td>
+                        <td data-label="Abono capital">{{ '{:,.0f}'.format(user.abono_capital) | replace(',', '.') }}</td>
+                        <td data-label="Abono intereses">{{ '{:,.0f}'.format(user.abono_intereses) | replace(',', '.') }}</td>
+                        <td data-label="Estado">{{ user.nombre_estado }}</td>   
+                        <td data-label="Días mora">{{user.dias_mora}}</td> 
+                        <td data-label="Agregar pago" data-id="{{ user.id_pago }}">
                             <a href="{{ url_for('payment', id=user.id_pago) }}">
                                 <img src="../static/icons/cash-coin.svg" alt="cash icon" class="icon" />
                             </a>

@@ -78,85 +78,97 @@
         </div>
     </nav>
     <div class="container">
-        <h1 class="title">Lista de pagos</h1>
-    
+        <h1 class="title">Lista de creditos</h1>
+
+        
         <!-- Filtros -->
         <form method="GET" action="">
             <div class="filters">
                 <label for="filtro_usuario">Usuario:</label>
                 <input placeholder="Buscar usuario por nombre" type="text" id="filtro_usuario" name="filtro_usuario" value="{{ filtro_usuario }}" class="form-card__input-inline">
                 
-                <label for="filtro_estado">Estado:</label>
-                <select id="filtro_estado" name="filtro_estado" class="form-card__input-inline">
-                    <option value="">Todos</option>
-                    <option value="pagado" {% if filtro_estado == 'pagado' %}selected{% endif %}>Pagado</option>
-                    <option value="pendiente" {% if filtro_estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                    <option value="vencido" {% if filtro_estado == 'vencido' %}selected{% endif %}>Vencido</option>
-                </select>
-                
                 <button type="submit" class="btn btn--green">Filtrar</button>
             </div>
         </form>
+
         <!-- Mostrar la suma del monto total en un input no editable con formato colombiano -->
         <div class="total-monto">
-            <label for="totalMonto">Total Monto de los Pagos:</label>
+            <label for="totalMonto">Total Monto de los creditos:</label>
             <input type="text" id="totalMonto" value="{{ '{:,.0f}'.format(suma_monto) | replace(',', '.') }}" readonly class="form-control">
         </div>
+            
 
-    
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Usuario</th>
-                    <th>Cuota</th>
-                    <th>Fecha programada</th>
-                    <th>Fecha pago</th>
-                    <th>Monto</th>
-                    <th>Abono capital</th>
-                    <th>Abono intereses</th>
-                    <th>Estado</th>
-                    <th>Días mora</th>
-                    <th>Agregar pago</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in data %}
-                <tr>
-                    <td data-label="ID">{{ user.id_pago }}</td>
-                    <td data-label="Usuario">{{ user.nombre_completo }}</td>
-                    <td data-label="Cuota">{{ user.numero_cuota }}</td>
-                    <td data-label="Fecha programada">{{ user.fecha_pago_programada }}</td>
-                    <td data-label="Fecha pago">{{ user.fecha_pago_real or "" }}</td>
-                    <td data-label="Monto">{{ '{:,.0f}'.format(user.monto_cuota) | replace(',', '.') }}</td>
-                    <td data-label="Abono capital">{{ '{:,.0f}'.format(user.abono_capital) | replace(',', '.') }}</td>
-                    <td data-label="Abono intereses">{{ '{:,.0f}'.format(user.abono_intereses) | replace(',', '.') }}</td>
-                    <td data-label="Estado">{{ user.nombre_estado }}</td>
-                    <td data-label="Días mora">{{ user.dias_mora }}</td>
-                    <td data-label="Agregar pago">
-                        <a href="{{ url_for('payment', id=user.id_pago) }}">
-                            <img src="../static/icons/cash-coin.svg" alt="cash icon" class="icon" />
-                        </a>
-                    </td>
-                </tr>
+        <!-- Tabla de usuarios -->
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Credito</th>
+                        <th>Interes</th>
+                        <th>Cuotas</th>
+                        <th>Modalidad</th>
+                        <th>Ganancia</th>
+                        <th>Fecha Credito</th>
+                        <th>Fecha Creación</th>
+                        <th>Fecha Actualización</th>
+                        <th>Editar</th>
+                        <th>Detalles</th>
+                        <th>Eliminar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in data %}
+                    <tr>
+                        <td data-label="ID">{{ user.id_credito }}</td>
+                        <td data-label="Usuario">{{ user.nombre_completo }}</td>
+                        <td data-label="Credito">{{ '{:,.0f}'.format(user.monto_credito) | replace(',', '.') }}</td>
+                        <td data-label="Interes">{{ '{:,.2f}'.format(user.tasa_interes).replace('.', ',') }}</td>
+                        <td data-label="Cuotas">{{ user.numero_cuotas }}</td>
+                        <td data-label="Modalidad">{{ user.nombre_modalidad }}</td>
+                        <td data-label="Ganancia">{{ '{:,.0f}'.format(user.ganancia_total) | replace(',', '.') }}</td>
+            
+                        <td data-label="Fecha Credito">{{ user.fecha_credito if user.fecha_credito else ''}}</td>
+                        <td data-label="Fecha Creación">{{ user.fecha_creacion if user.fecha_creacion else ''}}</td>
+                        <td data-label="Fecha Actualización">{{ user.fecha_actualizacion if user.fecha_actualizacion else ''}}</td>
+                        <td data-label="Editar" data-id="{{ user.id_credito }}">
+                            <a href="{{ url_for('update_credito', id=user.id_credito) }}">
+                                <img src="../static/icons/pencil.svg" alt="info icon" class="icon" />
+                            </a>
+                        </td>
+                        <td data-label="Detalles" data-id="{{ user.id_credito }}">
+                            <a href="{{ url_for('list_pagos', id=user.id_credito) }}">
+                                <img src="../static/icons/info-circle.svg" alt="info icon" class="icon" />
+                            </a>
+                        </td>
+                        <td data-label="Eliminar"> 
+                            <button class="eliminarBtn" data-id="{{ user.id_credito }}" data-correo="{{ user.nombre_completo}}">
+                                <img src="../static/icons/trash.svg" alt="Trash icon" class="icon" />
+                            </button>
+                        </td>
+                        
+
+                    </tr>
+                    {% endfor %}                          
+                </tbody>
+            </table>
+
+            <!-- Controles de Paginación -->
+            <div class="pagination">
+                {% if pagina_actual > 1 %}
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual - 1 }}">&laquo; Anterior</a>
+                {% endif %}
+                {% for pagina in paginas_visibles %}
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
                 {% endfor %}
-            </tbody>
-        </table>
-    
-        <!-- Controles de Paginación -->
-        <div class="pagination">
-            {% if pagina_actual > 1 %}
-                <a href="?pagina={{ pagina_actual - 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}">&laquo; Anterior</a>
-            {% endif %}
-            {% for pagina in paginas_visibles %}
-                <a href="?pagina={{ pagina }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
-            {% endfor %}
-            {% if pagina_actual < total_paginas %}
-                <a href="?pagina={{ pagina_actual + 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}">Siguiente &raquo;</a>
-            {% endif %}
+                {% if pagina_actual < total_paginas %}
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual + 1 }}">Siguiente &raquo;</a>
+                {% endif %}
+            </div>
         </div>
+
     </div>
-    
 
     <!-- Modal -->
     <div id="myModal" class="modal">
