@@ -77,16 +77,15 @@
         </div>
     </nav>
     <div class="container">
-
         <h1 class="title">Registro de credito</h1>
-
+    
         <form class="form-card" id="register-form" method="post" action="{{ url_for('register_credito', id=id_usuario) }}">
-            <input type="hidden" name="csrf_token" value ="{{ csrf_token() }}"  />          
-
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />          
+    
             <h2 class="form-card__subtitle">Usuario</h2>
-
+    
             <input type="hidden" name="id_usuario" value="{{ id_usuario }}">
-
+    
             <div class="form-card__group">
                 <label class="form-card__label" for="full_name">Nombre completo:</label>
                 <input 
@@ -98,21 +97,49 @@
                     value="{{ nombre_completo }}" 
                     readonly>
             </div>
-
-            <h2 class="form-card__subtitle">Datos de credito</h2>
-
-
+    
+            <h2 class="form-card__subtitle">Datos de pasajeros</h2>
+    
             <div class="form-card__group">
-                <label class="form-card__label" for="amount">Monto:</label>
+                <label class="form-card__label" for="adults">Cantidad de adultos:</label>
+                <input
+                    class="form-card__input"
+                    type="number"
+                    name="adults"
+                    id="adults"
+                    placeholder="Ingrese cantidad de adultos"
+                    min="0"
+                    value="0"
+                >
+                <p class="form-card__error">*Ingrese un número válido.</p>
+            </div>
+    
+            <div class="form-card__group">
+                <label class="form-card__label" for="children">Cantidad de niños (menores de 14 años):</label>
+                <input
+                    class="form-card__input"
+                    type="number"
+                    name="children"
+                    id="children"
+                    placeholder="Ingrese cantidad de niños"
+                    min="0"
+                    value="0"
+                >
+                <p class="form-card__error">*Ingrese un número válido.</p>
+            </div>
+    
+            <h2 class="form-card__subtitle">Datos de credito</h2>
+    
+            <div class="form-card__group">
+                <label class="form-card__label" for="amount">Monto total:</label>
                 <input
                     class="form-card__input"
                     type="text"
                     name="amount"
                     id="amount"
-                    placeholder="Ingrese el monto"
-                    oninput="validateNumericInput(this)"
+                    placeholder="Monto total"
+                    readonly
                 >
-                <p class="form-card__error">*Ingrese un número válido.</p>
             </div>
             
             <div class="form-card__group">
@@ -122,58 +149,25 @@
                     type="text"
                     name="interest_rate" 
                     id="interest_rate" 
-                    placeholder="Ingrese la tasa de interés" 
+                    placeholder="Ingrese la tasa de interés"
                     oninput="validateInterestRateInput(this)"
+                    value="0"
                 >
                 <p class="form-card__error">
                     *La tasa de interés debe ser un número decimal válido.
                 </p>
             </div>
             
-            <script>
-                // Función que elimina cualquier caracter no numérico a medida que el usuario escribe
-                function validateNumericInput(input) {
-                    // Eliminar todo lo que no sea número
-                    input.value = input.value.replace(/\D/g, ''); // Elimina todo lo que no sea número
-                }
-            
-                // Función especial para permitir coma en la tasa de interés
-                function validateInterestRateInput(input) {
-                    // Paso 1: Reemplazar el punto por coma, si se encuentra
-                    input.value = input.value.replace('.', ',');
-            
-                    // Paso 2: Permitir solo un número de coma
-                    if ((input.value.match(/,/g) || []).length > 1) {
-                        // Si hay más de una coma, eliminar la última
-                        input.value = input.value.replace(/,([^,]*)$/, '$1');
-                    }
-            
-                    // Paso 3: Eliminar cualquier otro caracter no numérico
-                    input.value = input.value.replace(/[^0-9,]/g, ''); // Elimina caracteres no numéricos, exceptuando la coma
-                }
-            
-                // Función para prevenir caracteres no numéricos en los campos
-                function preventInvalidChars(e) {
-                    if (
-                        e.key === 'e' ||
-                        e.key === 'E' ||
-                        e.key === '-' ||
-                        e.key === '+' ||
-                        e.key === '.'
-                    ) {
-                        e.preventDefault(); // Previene la entrada de estos caracteres
-                    }
-                }
-            
-                // Agregar el listener a ambos campos
-                document.getElementById('amount').addEventListener('keydown', preventInvalidChars);
-                document.getElementById('interest_rate').addEventListener('keydown', preventInvalidChars);
-            </script>
-            
-            
             <div class="form-card__group">
                 <label class="form-card__label" for="installments">Número de cuotas:</label>
-                <input class="form-card__input" type="number" name="installments" id="installments" placeholder="Ingrese el número de cuotas">
+                <input 
+                    class="form-card__input" 
+                    type="number" 
+                    name="installments" 
+                    id="installments" 
+                    placeholder="Ingrese el número de cuotas"
+                    value="6"
+                >
                 <p class="form-card__error">
                     *El número de cuotas debe ser un entero positivo.
                 </p>
@@ -182,10 +176,12 @@
             <div class="form-card__group">
                 <label class="form-card__label" for="modalidad">Modalidad:</label>
                 <select class="form-card__input" name="modalidad" id="modalidad">
-                    <option value="" disabled selected>Seleccione una modalidad</option>
-
+                    <option value="" disabled>Seleccione una modalidad</option>
                     {% for modalidad in modalidades %}
-                    <option value="{{modalidad.id_modalidad}}">{{modalidad.nombre_modalidad}}</option>
+                        <option value="{{modalidad.id_modalidad}}" 
+                            {% if modalidad.nombre_modalidad == 'Mensual' %}selected{% endif %}>
+                            {{modalidad.nombre_modalidad}}
+                        </option>
                     {% endfor %}
                 </select>
                 <p class="form-card__error">
@@ -195,27 +191,24 @@
             
             <div class="form-card__group">
                 <label class="form-card__label" for="date_start">Inicio de cuota:</label>
-                <input type="date" class="form-card__input" name="date_start" id="date_start" placeholder="Inicio de cuota">
+                <input type="date" class="form-card__input" name="date_start" id="date_start">
                 <p class="form-card__error">
                     *Debe seleccionar una fecha de inicio.
                 </p>
             </div>
-
+    
             <h2 class="form-card__subtitle">Información dinámica</h2>
-
-
+    
             <div class="form-card__group">
                 <label class="form-card__label" for="profit">Ganancia:</label>
                 <input class="form-card__input" type="text" name="profit" id="profit" placeholder="Ganancia" readonly>
             </div>
-
+    
             <div class="form-card__group">
                 <label class="form-card__label" for="valor_cuota">Valor cuota:</label>
                 <input class="form-card__input" type="text" name="valor_cuota" id="valor_cuota" placeholder="Valor cuota" readonly>
             </div>
-            
-
-
+    
             <div class="cl"></div>
             <div class="form-card__buttons">
                 <button class="btn btn--green btn--block" type="submit">Crear credito</button>
@@ -227,14 +220,13 @@
             <div class="form-card__good {% if mostrar_exito %}visible{% else %}invisible{% endif %}">
                 Credito registrado exitosamente.
             </div>  
-
+    
             <p class="form-card__error" id="form-error">
                 Rellene todos los campos del formulario correctamente antes de realizar el envío.
             </p>
         </form>
     </div>
     <script src="{{ url_for('static', filename='js/registrar_credito.js') }}" type="module"></script>
-
 
 
 </body>

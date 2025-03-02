@@ -59,6 +59,18 @@ body {
     transform: scale(1.2);
 }
 
+.contratoBtn {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    transition: transform 0.3s ease;
+    cursor: pointer; 
+}
+
+.contratoBtn:hover{
+    transform: scale(1.2);
+}
+
 [data-label="Editar"] img.icon:hover {
     transform: scale(1.2);
 }

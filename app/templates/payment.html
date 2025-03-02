@@ -80,11 +80,11 @@
 
         <h1 class="title">Realizar pago</h1>
 
-        <form class="form-card" id="register-form" method="post" action="{{ url_for('payment', id=pago.id_pago) }}">
+        <form class="form-card" id="register-form" method="post" action="{{ url_for('payment', id=pago.id_pago) }}" enctype="multipart/form-data">
 
             <input type="hidden" name="csrf_token" value ="{{ csrf_token() }}"  />          
 
-            <h2 class="form-card__subtitle">Fecha de pago</h2>
+            <h2 class="form-card__subtitle">Regitrar pago</h2>
 
             <div class="form-card__group">
                 <label class="form-card__label" for="fecha_pago_real">Fecha pago:</label>
@@ -93,6 +93,54 @@
                     *Debe seleccionar una fecha de pago.
                 </p>
             </div>
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="medio_pago">Medio pago:</label>
+                <input type="text" class="form-card__input" name="medio_pago" id="medio_pago" placeholder="Medio de pago" value="{{ pago.medio if pago.medio else '' }}">
+                <p class="form-card__error">
+                    *Debe escribir un medio de pago.
+                </p>
+            </div>
+
+            <div class="form-card__group">
+                <label class="form-card__label" for="file">Comprobante:</label>
+                <div id="file-actions" data-pago-id="{{ pago.id_pago }}">
+                    <!-- El contenido se llenará dinámicamente -->
+                </div>
+            
+                <div id="upload-section">
+                    <input class="form-card__input" type="file" name="file" id="file" accept="image/*">
+                </div>
+            </div>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const pagoId = document.getElementById('file-actions').getAttribute('data-pago-id');
+                    const fileActionsDiv = document.getElementById('file-actions');
+                    const uploadSection = document.getElementById('upload-section');
+                    const fileInput = document.getElementById('file');
+                    let fileExists = false;
+                
+                    // Función para actualizar la interfaz según el estado del archivo
+                    function updateInterface() {
+                        fetch(`/pago/${pagoId}/archivo`, { method: 'GET' })
+                            .then(response => {
+                                fileExists = response.status === 200;
+                                
+                                if (fileExists) {
+                                    fileActionsDiv.innerHTML = `
+                                        <a href="/pago/${pagoId}/archivo" class="btn btn-download">Descargar Archivo</a>
+                                    `;
+                                }
+                            })
+                            .catch(error => console.error('Error al verificar archivo:', error));
+                    }
+                
+    
+                    // Inicializar la interfaz
+                    updateInterface();
+                });
+                </script>
 
 
             <h2 class="form-card__subtitle">Información de pago</h2>

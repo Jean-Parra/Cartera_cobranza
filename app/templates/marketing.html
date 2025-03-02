@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta tu Crédito</title>
+    <style>
+        /* Existing styles */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .container {
+            background: #fff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 350px;
+            position: relative;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        input {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #007BFF;
+            border: none;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .loader {
+            display: none;
+            margin: 15px auto;
+            width: 50px;
+            height: 50px;
+            border: 5px solid #ccc;
+            border-top-color: #007BFF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+        .alert {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 16px;
+            text-align: center;
+            display: none;
+        }
+        .alert.success { 
+            background-color: #d4edda; 
+            color: green; 
+            border: 1px solid green; 
+        }
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background-color: #ddd;
+            border-radius: 3px;
+            overflow: hidden;
+            display: none;
+            margin-top: 10px;
+        }
+        .progress-bar div {
+            height: 100%;
+            width: 0;
+            background-color: #28a745;
+            animation: progress 10s linear forwards;
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+        .error {
+            color: red;
+            font-size: 14px;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* New styles for terms checkbox and modal */
+        .terms-container {
+            margin: 15px 0;
+            text-align: left;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .terms-container input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+        
+        .terms-container label {
+            margin: 0;
+            line-height: 1;
+        }
+        .terms-link {
+            color: #007BFF;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            position: relative;
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            width: 70%;
+            max-width: 500px;
+            border-radius: 10px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .close-modal {
+            position: absolute;
+            right: 20px;
+            top: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        .close-modal:hover {
+            color: #333;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Consulta tu Crédito</h2>
+
+        <!-- Mensaje de éxito (se muestra si Flask lo manda) -->
+        {% if mensaje_exito %}
+        <div class="alert success" id="mensaje-exito" style="display: block;">
+            ¡Felicitaciones! Has sido aprobado para el financiamiento del servicio. Te invitamos a contactar al área de financiamiento para más información sobre los siguientes pasos. 
+            <a id="whatsappLink" class="whatsapp-btn" href="https://wa.me/573176990079?text=Hola,%20me%20aprobaron%20para%20la%20financiación,%20quisiera%20más%20información." target="_blank">📲 Ir a WhatsApp</a>
+
+        </div>
+        {% else %}
+        <div class="alert success" id="mensaje-exito" style="display: none;">
+            ¡Felicitaciones! Has sido aprobado para el financiamiento del servicio. Te invitamos a contactar al área de financiamiento para más información sobre los siguientes pasos. 
+            <a id="whatsappLink" class="whatsapp-btn" href="https://wa.me/573176990079?text=Hola,%20me%20aprobaron%20para%20la%20financiación,%20quisiera%20más%20información." target="_blank">📲 Ir a WhatsApp</a>
+
+        </div>
+        {% endif %}
+
+        <!-- Barra de carga (se oculta al inicio) -->
+        <div class="loader"></div>
+
+        <form id="miFormulario" method="POST" action="{{ url_for('marketing') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />          
+
+            <input type="text" id="nombre" name="nombre" placeholder="Nombre" required>
+            <div class="error" id="error-nombre">El nombre debe tener entre 3 y 50 caracteres.</div>
+
+            <input type="number" id="cedula" name="cedula" placeholder="Cédula" required>
+            <div class="error" id="error-cedula">La cédula debe tener entre 6 y 10 dígitos.</div>
+
+            <input type="number" id="numero" name="numero" placeholder="Número" required>
+            <div class="error" id="error-numero">El número debe tener 10 dígitos.</div>
+
+            <input type="email" id="correo" name="correo" placeholder="Correo" required>
+            <div class="error" id="error-correo">Ingresa un correo válido.</div>
+
+            <div class="terms-container">
+                <input type="checkbox" id="terms" required>
+                <label for="terms">Acepto los <span class="terms-link" id="openTerms">términos y condiciones</span></label>
+                <div class="error" id="error-terms">Debes aceptar los términos y condiciones.</div>
+            </div>
+
+            <button type="submit" id="boton-enviar">Buscar</button>
+        </form>
+    </div>
+
+    <!-- Modal for Terms and Conditions -->
+    <div id="termsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeTerms">&times;</span>
+            <h3>Términos y Condiciones</h3>
+            <div>
+                <p>1. Al utilizar este servicio, usted acepta proporcionar información verdadera y precisa.</p>
+                <p>2. La información proporcionada será utilizada únicamente para evaluar su solicitud de crédito.</p>
+                <p>3. Nos comprometemos a proteger su información personal de acuerdo con nuestra política de privacidad.</p>
+                <p>4. El resultado de la evaluación es preliminar y no constituye una aprobación definitiva del crédito.</p>
+                <p>5. Nos reservamos el derecho de solicitar información adicional si es necesario.</p>
+                <!-- Add more terms as needed -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Regular expressions for validation
+        const validations = {
+            nombre: {
+                regex: /^[A-Za-zÁáÉéÍíÓóÚúÑñ\s]{3,50}$/,
+                error: "El nombre debe tener entre 3 y 50 caracteres y solo letras."
+            },
+            cedula: {
+                regex: /^\d{6,10}$/,
+                error: "La cédula debe tener entre 6 y 10 dígitos."
+            },
+            numero: {
+                regex: /^\d{10}$/,
+                error: "El número debe tener 10 dígitos."
+            },
+            correo: {
+                regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                error: "Ingresa un correo válido."
+            }
+        };
+        // Function to validate a single field
+        function validateField(field) {
+            const value = field.value.trim();
+            const fieldName = field.id;
+            const errorElement = document.getElementById(`error-${fieldName}`);
+            
+            if (validations[fieldName]) {
+                const isValid = validations[fieldName].regex.test(value);
+                errorElement.style.display = isValid ? "none" : "block";
+                errorElement.textContent = validations[fieldName].error;
+                return isValid;
+            }
+            return true;
+        }
+
+        // Add input event listeners to all fields
+        Object.keys(validations).forEach(fieldName => {
+            const field = document.getElementById(fieldName);
+            if (field) {
+                field.addEventListener('input', function() {
+                    validateField(this);
+                    checkFormValidity();
+                });
+            }
+        });
+
+        // Terms checkbox event listener
+        document.getElementById('terms').addEventListener('change', function() {
+            const errorTerms = document.getElementById('error-terms');
+            errorTerms.style.display = this.checked ? 'none' : 'block';
+            checkFormValidity();
+        });
+
+        // Function to check overall form validity
+        function checkFormValidity() {
+            const submitButton = document.getElementById('boton-enviar');
+            const terms = document.getElementById('terms');
+            
+            // Check all field validations
+            const fieldsValid = Object.keys(validations).every(fieldName => {
+                const field = document.getElementById(fieldName);
+                return validations[fieldName].regex.test(field.value.trim());
+            });
+            
+            // Enable/disable submit button based on all validations
+            submitButton.disabled = !(fieldsValid && terms.checked);
+        }
+
+        // Modal functionality
+        const modal = document.getElementById("termsModal");
+        const openTermsBtn = document.getElementById("openTerms");
+        const closeTermsBtn = document.getElementById("closeTerms");
+
+        openTermsBtn.onclick = function() {
+            modal.style.display = "block";
+        }
+
+        closeTermsBtn.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+
+        // Form validation
+        document.getElementById("miFormulario").addEventListener("submit", function(event) {
+            event.preventDefault(); 
+
+                    // Validate all fields one last time
+            const isValid = Object.keys(validations).every(fieldName => {
+                const field = document.getElementById(fieldName);
+                return validateField(field);
+            });
+            
+            const terms = document.getElementById('terms');
+            if (!terms.checked) {
+                document.getElementById('error-terms').style.display = 'block';
+                return;
+            }
+            
+            if (!isValid) return;
+
+            let boton = document.getElementById("boton-enviar");
+            document.querySelector(".loader").style.display = "block";
+            boton.disabled = true;
+            boton.innerText = "Procesando...";
+
+            setTimeout(() => {
+                event.target.submit();
+            }, 15000);
+        });
+    </script>
+
+</body>
+</html>

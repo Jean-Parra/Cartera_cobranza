@@ -1,75 +1,97 @@
+// Precios constantes
+const ADULT_PRICE = 1096000;
+const CHILD_PRICE = 694000;
+
 document.addEventListener('DOMContentLoaded', () => {
+
     // Seleccionar los campos
+    const adultsInput = document.getElementById('adults');
+    const childrenInput = document.getElementById('children');
     const amountInput = document.getElementById('amount');
     const interestRateInput = document.getElementById('interest_rate');
     const installmentsInput = document.getElementById('installments');
+    const dateStartInput = document.getElementById('date_start');
+    const modalidadSelect = document.getElementById('modalidad');
+    
+    // Establecer la fecha de hoy
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0];
+    dateStartInput.value = formattedDate;
 
-    // Función para formatear el monto con separadores de miles
-    const formatNumber = (number) => {
-        return number.toLocaleString('es-CO'); // Formato para Colombia
-    };
+    // Validar los valores iniciales
+    fields.interest_rate = validateField('interest_rate', interestRateInput.value);
+    fields.installments = validateField('installments', installmentsInput.value);
+    fields.modalidad = modalidadSelect.value !== '';
+    fields.date_start = dateStartInput.value !== '';
 
-    // Validar y formatear los valores iniciales
-    if (amountInput && amountInput.value) {
-        const rawValue = parseInt(amountInput.value.replace(/\./g, ''), 10); // Remover puntos
-        if (!isNaN(rawValue)) {
-            amountInput.value = formatNumber(rawValue);
-            fields.amount = true; // Marcar como válido
-        }
-    }
+    // Listeners para los campos de adultos y niños
+    adultsInput.addEventListener('input', calculateAmount);
+    childrenInput.addEventListener('input', calculateAmount);
 
-    if (interestRateInput && interestRateInput.value) {
-        interestRateInput.value = interestRateInput.value.replace('.', ','); // Reemplazar punto por coma
-        if (regEx.interest_rate.test(interestRateInput.value)) {
-            fields.interest_rate = true; // Marcar como válido
-        }
-    }
-
-    if (installmentsInput && installmentsInput.value) {
-        const rawValue = parseInt(installmentsInput.value.replace(/\./g, ''), 10); // Remover puntos
-        if (!isNaN(rawValue)) {
-            installmentsInput.value = formatNumber(rawValue);
-            fields.installments = true; // Marcar como válido
-        }
-    }
-
-    // Si todos los campos necesarios tienen valores válidos, calcular ganancias y cuota
-    if (fields.amount && fields.interest_rate && fields.installments) {
-        calculateProfit();
-    }
+    // Calcular monto inicial
+    calculateAmount();
 });
 
-
 const regEx = {
-    amount: /^\d+$/, // Solo números enteros positivos
-    interest_rate: /^\d+([\,]\d{1,2})?$/, // Decimal con coma, máximo 2 decimales
-    installments: /^\d+$/, // Solo números enteros positivos
+    amount: /^\d+$/,
+    interest_rate: /^\d+([\,]\d{1,2})?$/,
+    installments: /^\d+$/,
 };
 
 const fields = {
-    amount: false,
+    adults: true,
+    children: true,
+    amount: true,
     interest_rate: false,
     installments: false,
     modalidad: false,
-    date_start: false,  // Nueva validación para la fecha
+    date_start: false,
 };
 
-const inputs = document.querySelectorAll('.form-card__input');
-const select = document.getElementById('modalidad');
-const dateStartInput = document.getElementById('date_start'); // Nuevo campo de fecha
-const form = document.getElementById('register-form');
-const formGeneralError = document.getElementById('form-error');
-const interestRateInput = document.getElementById('interest_rate');
+// Función para validar un campo específico
+const validateField = (fieldName, value) => {
+    if (!regEx[fieldName]) return true;
+    return regEx[fieldName].test(value.toString().trim().replace(/\./g, ''));
+};
 
-// Función para formatear números con separador de miles
+// Función para formatear números
 const formatNumber = (number) => {
-    return number.toLocaleString('es-CO'); // Formato para Colombia
+    return number.toLocaleString('es-CO');
 };
 
-// Recalcular ganancia
+// Función para calcular el monto total
+const calculateAmount = () => {
+    const adults = parseInt(document.getElementById('adults').value) || 0;
+    const children = parseInt(document.getElementById('children').value) || 0;
+    
+    const totalAmount = (adults * ADULT_PRICE) + (children * CHILD_PRICE);
+    document.getElementById('amount').value = formatNumber(totalAmount);
+    
+    calculateProfit();
+};
+
+// Función para validar entrada de tasa de interés
+function validateInterestRateInput(input) {
+    input.value = input.value.replace('.', ',');
+    
+    if ((input.value.match(/,/g) || []).length > 1) {
+        input.value = input.value.replace(/,([^,]*)$/, '$1');
+    }
+    
+    input.value = input.value.replace(/[^0-9,]/g, '');
+}
+
+// Función para prevenir caracteres inválidos
+function preventInvalidChars(e) {
+    if (e.key === 'e' || e.key === 'E' || e.key === '-' || e.key === '+' || e.key === '.') {
+        e.preventDefault();
+    }
+}
+
+// Función para calcular ganancia y cuota
 const calculateProfit = () => {
     const amount = parseInt(document.getElementById('amount').value.replace(/\./g, ''), 10);
-    const interestRate = parseFloat(document.getElementById('interest_rate').value.replace(',', '.')) / 100; // Convertir coma a punto
+    const interestRate = parseFloat(document.getElementById('interest_rate').value.replace(',', '.')) / 100;
     const installments = parseInt(document.getElementById('installments').value, 10);
 
     if (amount > 0 && installments > 0) {
@@ -77,125 +99,113 @@ const calculateProfit = () => {
         let totalGanancia;
 
         if (interestRate > 0) {
-            // Fórmula para calcular la cuota con interés compuesto
             cuota = (amount * interestRate * Math.pow(1 + interestRate, installments)) / 
                     (Math.pow(1 + interestRate, installments) - 1);
             totalGanancia = Math.round((cuota * installments) - amount);
         } else {
-            // Caso especial para tasa de interés 0%
             cuota = amount / installments;
-            totalGanancia = 0; // Sin ganancia si la tasa de interés es 0
+            totalGanancia = 0;
         }
 
-        const valor_cuota = Math.round(cuota); // Redondea a entero
+        const valor_cuota = Math.round(cuota);
 
-        // Actualiza los valores en el HTML
-        const valor_cuota_input = document.getElementById('valor_cuota');
-        const profitInput = document.getElementById('profit'); // Campo para ganancia
-
-        if (valor_cuota_input) {
-            valor_cuota_input.value = formatNumber(valor_cuota); // Asigna el valor con formato
-        }
-
-        if (profitInput) {
-            profitInput.value = formatNumber(totalGanancia); // Asigna el valor con formato
-        }
-
-
+        document.getElementById('valor_cuota').value = formatNumber(valor_cuota);
+        document.getElementById('profit').value = formatNumber(totalGanancia);
     } else {
-        // Limpia los campos si hay un error en los datos de entrada
-        const valor_cuota_input = document.getElementById('valor_cuota');
-        const profitInput = document.getElementById('profit');
-        if (valor_cuota_input) valor_cuota_input.value = '';
-        if (profitInput) profitInput.value = '';
+        document.getElementById('valor_cuota').value = '';
+        document.getElementById('profit').value = '';
     }
 };
 
-
-// Validación de campos
+// Agregar event listeners para campos editables
+const inputs = document.querySelectorAll('.form-card__input');
 inputs.forEach((input) => {
-    input.addEventListener('input', (e) => {
-        const { name, value } = e.target;
+    if (input.type !== 'hidden' && !input.readOnly) {
+        input.addEventListener('input', (e) => {
+            const { name, value } = e.target;
 
-        if (name === 'interest_rate') {
-            // Reemplazar punto por coma
-            e.target.value = e.target.value.replace('.', ',');
-        }
-
-        const numericValue = parseInt(value.replace(/\./g, ''), 10); // Convertir a número
-
-        if (name === 'installments') {
-            // Validar que las cuotas sean mayores a 0
-            if (numericValue <= 0) {
-                e.target.parentElement.classList.add('form-card__group--incorrect');
-                fields[name] = false;
-                calculateProfit(); // Limpiar ganancia si es inválido
+            if (name === 'adults' || name === 'children') {
+                const numValue = parseInt(value) || 0;
+                if (numValue < 0) {
+                    e.target.value = 0;
+                }
+                fields[name] = true;
+                calculateAmount();
                 return;
             }
-        }
 
-        if (regEx[name] && regEx[name].test(value.trim().replace(/\./g, ''))) {
-            e.target.parentElement.classList.remove('form-card__group--incorrect');
-            fields[name] = true;
-
-            // Formatear números en tiempo real para los campos numéricos
-            if (name === 'amount' || name === 'installments') {
-                e.target.value = formatNumber(parseInt(value.replace(/\./g, ''), 10));
+            if (name === 'interest_rate') {
+                e.target.value = e.target.value.replace('.', ',');
             }
-            calculateProfit();
-        } else {
-            e.target.parentElement.classList.add('form-card__group--incorrect');
-            fields[name] = false;
-            calculateProfit(); // Si no es válido, limpiar ganancia
-        }
-    });
-});
 
-// Validación para el campo de selección "modalidad"
-select.addEventListener('change', (e) => {
-    if (e.target.value) {
-        select.parentElement.classList.remove('form-card__group--incorrect');
-        fields.modalidad = true;
-    } else {
-        select.parentElement.classList.add('form-card__group--incorrect');
-        fields.modalidad = false;
+            if (name === 'installments') {
+                const numValue = parseInt(value);
+                if (numValue <= 0) {
+                    e.target.parentElement.classList.add('form-card__group--incorrect');
+                    fields[name] = false;
+                    return;
+                }
+            }
+
+            if (regEx[name] && regEx[name].test(value.trim().replace(/\./g, ''))) {
+                e.target.parentElement.classList.remove('form-card__group--incorrect');
+                fields[name] = true;
+                calculateProfit();
+            } else {
+                e.target.parentElement.classList.add('form-card__group--incorrect');
+                fields[name] = false;
+            }
+        });
     }
 });
 
-// Validación para el campo "date_start"
-dateStartInput.addEventListener('input', (e) => {
-    const value = e.target.value;
-    if (value) {
-        dateStartInput.parentElement.classList.remove('form-card__group--incorrect');
-        fields.date_start = true;
-    } else {
-        dateStartInput.parentElement.classList.add('form-card__group--incorrect');
-        fields.date_start = false;
-    }
+// Event listeners para modalidad y fecha
+document.getElementById('modalidad').addEventListener('change', (e) => {
+    fields.modalidad = e.target.value !== '';
+    e.target.parentElement.classList.toggle('form-card__group--incorrect', !fields.modalidad);
 });
+
+document.getElementById('date_start').addEventListener('input', (e) => {
+    fields.date_start = e.target.value !== '';
+    e.target.parentElement.classList.toggle('form-card__group--incorrect', !fields.date_start);
+});
+
+// Prevenir caracteres inválidos en campos numéricos
+document.getElementById('interest_rate').addEventListener('keydown', preventInvalidChars);
+
+// Validación del formulario
+const form = document.getElementById('register-form');
+const formGeneralError = document.getElementById('form-error');
 
 form.addEventListener('submit', (e) => {
     e.preventDefault();
-    let flag = true; // Variable para verificar si todos los campos son válidos
+    
+    const adults = parseInt(document.getElementById('adults').value) || 0;
+    const children = parseInt(document.getElementById('children').value) || 0;
+    
+    if (adults === 0 && children === 0) {
+        formGeneralError.classList.add('form-card__error--visible');
+        formGeneralError.textContent = 'Debe ingresar al menos un pasajero.';
+        return;
+    }
 
-    // Recorrer los campos en el objeto `fields` para verificar cuáles son inválidos
-    Object.entries(fields).forEach(([fieldName, isValid]) => {
+    let isValid = true;
+    
+    // Verificar todos los campos
+    Object.entries(fields).forEach(([fieldName, isValidField]) => {
         const input = document.querySelector(`[name="${fieldName}"]`) || document.getElementById(fieldName);
-
-        if (!isValid && input) {
-            flag = false; // Marcar que hay al menos un campo inválido
-            input.parentElement.classList.add('form-card__group--incorrect'); // Resaltar el campo inválido
-        } else if (isValid && input) {
-            input.parentElement.classList.remove('form-card__group--incorrect'); // Remover resaltado si es válido
+        if (!isValidField && input) {
+            isValid = false;
+            input.parentElement.classList.add('form-card__group--incorrect');
         }
     });
 
-    // Mostrar el error general si hay algún campo inválido
-    if (!flag) {
+    if (!isValid) {
         formGeneralError.classList.add('form-card__error--visible');
         formGeneralError.textContent = 'Por favor, complete todos los campos correctamente.';
-    } else {
-        formGeneralError.classList.remove('form-card__error--visible');
-        form.submit(); // Enviar el formulario si todos los campos son válidos
+        return;
     }
+
+    formGeneralError.classList.remove('form-card__error--visible');
+    form.submit();
 });

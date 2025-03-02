@@ -93,8 +93,18 @@
                     <option value="pendiente" {% if filtro_estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
                     <option value="vencido" {% if filtro_estado == 'vencido' %}selected{% endif %}>Vencido</option>
                 </select>
+
+                <label for="fecha_inicio">Desde:</label>
+                <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-card__input-inline">
+
+                <label for="fecha_fin">Hasta:</label>
+                <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="form-card__input-inline">
+
                 
+                    
                 <button type="submit" class="btn btn--green">Filtrar</button>
+                <a href="{{ url_for('download_pagos', fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, filtro_usuario=filtro_usuario) }}" class="btn btn--blue">Descargar Excel</a>
+
             </div>
         </form>
         <!-- Mostrar la suma del monto total en un input no editable con formato colombiano -->
@@ -146,13 +156,13 @@
         <!-- Controles de Paginación -->
         <div class="pagination">
             {% if pagina_actual > 1 %}
-                <a href="?pagina={{ pagina_actual - 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}">&laquo; Anterior</a>
+                <a href="?pagina={{ pagina_actual - 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">&laquo; Anterior</a>
             {% endif %}
             {% for pagina in paginas_visibles %}
-                <a href="?pagina={{ pagina }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
+                <a href="?pagina={{ pagina }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
             {% endfor %}
             {% if pagina_actual < total_paginas %}
-                <a href="?pagina={{ pagina_actual + 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}">Siguiente &raquo;</a>
+                <a href="?pagina={{ pagina_actual + 1 }}&filtro_usuario={{ filtro_usuario }}&filtro_estado={{ filtro_estado }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">Siguiente &raquo;</a>
             {% endif %}
         </div>
     </div>

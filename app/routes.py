@@ -1,14 +1,29 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+import io
 import os
-from flask import flash, jsonify, redirect, render_template, request, send_file, url_for
+import subprocess
+from docx import Document
+from flask import Response, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user,login_required, login_user, logout_user
 import numpy_financial as npf
+import xlsxwriter
 from app import app, db, s
 from app.metodos import send_email_amazon
 from app.models import Administradores, Auditoria, Creditos, EstadosDeuda, ModalidadesPago, Pagos, Usuarios
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from functools import wraps
 from werkzeug.utils import secure_filename
+
+from docx2pdf import convert
+import pythoncom
+import tempfile
+from num2words import num2words
+from docx.shared import Inches
+
+
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from PIL import Image
 
 
 # Ruta base del directorio actual
@@ -16,10 +31,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Ruta de la carpeta donde se guardarán los PDFs
 UPLOAD_FOLDER = os.path.join(BASE_DIR, '..', 'pdfs')
+UPLOAD_FOLDER_PAGOS = os.path.join(BASE_DIR, '..', 'images')
 
 # Asegurarse de que la carpeta exista
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
+os.makedirs(UPLOAD_FOLDER_PAGOS, exist_ok=True)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 def check_db_connection(f):
     @wraps(f)
@@ -62,6 +79,25 @@ def login():
     elif request.method == "GET":
         return render_template("login.html")
     
+@app.route("/marketing", methods=["GET", "POST"])
+def marketing():
+    mensaje_exito = False  # Por defecto, no se muestra el mensaje
+
+    if request.method == "POST":
+        # Capturar datos del formulario
+        nombre = request.form.get("nombre")
+        cedula = request.form.get("cedula")
+        numero = request.form.get("numero")
+        correo = request.form.get("correo")
+
+        # Aquí podrías hacer algo con los datos (guardar en BD, etc.)
+        send_email_amazon("financiamientoreagendar@gmail.com", "Interesado en financiamiento", f"Nombre: {nombre} \nCedula: {cedula} \nNúmero: {numero} \nCorreo: {correo}")
+
+        mensaje_exito = True  # Activar el mensaje de éxito
+
+        return render_template("marketing.html", mensaje_exito=mensaje_exito)
+
+    return render_template("marketing.html", mensaje_exito=mensaje_exito)
 
 @app.route('/reset_password', methods=['GET', 'POST'])
 @check_db_connection
@@ -138,8 +174,9 @@ def payment(id):
     
     if request.method == "POST":
         fecha_pago_real = request.form.get("fecha_pago_real")
+        medio_pago = request.form.get("medio_pago")
 
-        if fecha_pago_real:  # Asegurarse de que se envió una fecha
+        if fecha_pago_real and medio_pago:  # Asegurarse de que se envió una fecha
            
 
             fecha_pago_programada = pago.fecha_pago_programada
@@ -153,6 +190,7 @@ def payment(id):
                 variable = "Agregar"
                 
             pago.fecha_pago_real = fecha_pago_real
+            pago.medio = medio_pago
             pago.dias_mora = dias_mora
             pago.id_estado_deuda = 2
             db.session.commit()
@@ -161,7 +199,8 @@ def payment(id):
             cambios = {
                 "id credito": id_credito,
                 "id pago": id,
-                "Fecha de pago": fecha_pago_real
+                "Fecha de pago": fecha_pago_real,
+                "Medio": medio_pago
             }
             
             auditoria = Auditoria(
@@ -173,6 +212,16 @@ def payment(id):
             )
             db.session.add(auditoria)
             db.session.commit()
+            
+            # Verificar si se ha subido un archivo
+            if 'file' in request.files:
+                file = request.files['file']
+                if file.filename != '':
+                    # Asegurarse de que el nombre del archivo sea seguro
+                    filename = secure_filename(file.filename)
+                    # Guardar el archivo con el nombre ID_USUARIO.pdf
+                    filepath = os.path.join('images', f"{id}.jpg")
+                    file.save(filepath)
             
             
             mostrar_exito = True
@@ -216,7 +265,10 @@ def register_credito(id):
         try:
             # Cálculo de la cuota fija
             cuota = round(-npf.pmt(monthly_interest_rate / 100, installments, amount))  # Cuota fija calculada con PMT
-            total_ganancia = round((cuota * installments) - amount)  # Ganancia total
+            if monthly_interest_rate == 0.0:
+                total_ganancia = 0
+            else:
+                total_ganancia = round((cuota * installments) - amount)  # Ganancia total
             # Inicialización de variables para el desglose
 
             nuevo_credito = Creditos(
@@ -502,7 +554,9 @@ def register_user():
                     cedula=cedula,
                     direccion=request.form.get("direccion"),
                     celular=request.form.get("celular"),
-                    correo=request.form.get("correo")
+                    correo=request.form.get("correo"),
+                    expedicion=request.form.get("expedicion"),
+                    residencia=request.form.get("residencia")
                 )
                 db.session.add(nuevo_usuario)
                 db.session.commit()
@@ -888,6 +942,182 @@ def list_pagos(id):
         ), 200
 
 
+@app.route('/download-pdf/<int:id>', methods=['POST'])
+def download_pdf(id):
+    pythoncom.CoInitialize()
+    
+    try:
+        credito = Creditos.query.get_or_404(id)
+        usuario = credito.usuario
+
+        def numero_a_texto(numero):
+            return num2words(numero, lang='es').upper()
+
+        # Formatear valores monetarios
+        monto_credito = f"{credito.monto_credito:,.0f}".replace(",", ".")
+        valor_cuota = int(credito.monto_credito / credito.numero_cuotas)
+        valor_cuota_formato = f"{valor_cuota:,.0f}".replace(",", ".")
+        
+        # Formatear la fecha
+        fecha = credito.fecha_credito
+        dia_texto = num2words(fecha.day, lang='es').capitalize()
+        meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", 
+                 "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        mes_texto = meses[fecha.month - 1]
+
+        # Preparar los datos para el documento
+        datos = {
+            "{{NOMBRE}}": usuario.nombre_completo.upper(),
+            "{{CEDULA}}": usuario.cedula,
+            "{{RESIDENCIA}}": usuario.residencia.upper(),
+            "{{DIRECCION}}": usuario.direccion.upper(),
+            "{{MONTO_TOTAL}}": monto_credito,
+            "{{ANTICIPO}}": "100.000",
+            "{{NUMERO_CUOTAS}}": str(credito.numero_cuotas),
+            "{{NUMERO_CUOTAS_TEXTO}}": num2words(credito.numero_cuotas, lang='es'),
+            "{{VALOR_CUOTA}}": valor_cuota_formato,
+            "{{MONTO_TOTAL_TEXTO}}": numero_a_texto(credito.monto_credito),
+            "{{ANTICIPO_TEXTO}}": "CIEN MIL",
+            "{{MONTO_COSTOS_CONSULARES_TEXTO}}": "OCHOCIENTOS TREINTA Y DOS MIL QUINIENTOS",
+            "{{MONTO_COSTOS_CONSULARES}}": "832.500",
+            "{{MONTO_VALOR_TEXTO}}": numero_a_texto(credito.monto_credito),
+            "{{MONTO_VALOR}}": monto_credito,
+            "{{NUMERO_CREDITO}}": str(credito.id_credito),
+            "{{FECHA_FIRMA}}": fecha.strftime("%d/%m/%Y"),
+            "{{FECHA_FIRMA_DIA_TEXTO}}": dia_texto,
+            "{{FECHA_FIRMA_DIA}}": str(fecha.day),
+            "{{FECHA_FIRMA_MES_TEXTO}}": mes_texto,
+            "{{FECHA_FIRMA_AÑO}}": str(fecha.year),
+            "{{EXPEDICION}}": usuario.expedicion.upper(),
+            "{{CORREO}}": usuario.correo.lower()
+        }
+
+        with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as docx_temp:
+            contrato = Document(r"C:\Users\yampi\Downloads\CONTRATO DE PRESTACIÓN DE SERVICIOS DE FINANCIAMIENTO.docx")
+
+            def insertar_imagen(parrafo, imagen_path):
+                """
+                Inserta una imagen manteniendo la alineación original del párrafo
+                """
+                try:
+                    # Guardar la alineación original antes de limpiar
+                    alineacion_original = parrafo.alignment
+                    
+                    # Limpiar el contenido actual del párrafo
+                    for run in parrafo.runs:
+                        run.text = ""
+                    
+                    # Agregar la imagen con tamaño controlado
+                    run = parrafo.add_run()
+                    run.add_picture(imagen_path, width=Inches(2))
+                    
+                    # Restaurar la alineación original
+                    parrafo.alignment = alineacion_original
+                    
+                    return True
+                except Exception as e:
+                    print(f"Error al insertar imagen: {str(e)}")
+                    return False
+
+            def get_alineacion_texto(texto):
+                """
+                Determina la alineación basada en el marcador
+                """
+                if "{{IMAGEN_DERECHA}}" in texto:
+                    return WD_ALIGN_PARAGRAPH.RIGHT
+                elif "{{IMAGEN_IZQUIERDA}}" in texto:
+                    return WD_ALIGN_PARAGRAPH.LEFT
+                return None
+
+            def reemplazar_en_parrafo(parrafo):
+                """
+                Reemplaza el texto y maneja la inserción de imágenes respetando alineación
+                """
+                texto_completo = "".join(run.text for run in parrafo.runs)
+                
+                # Verificar todos los posibles marcadores de imagen
+                marcadores_imagen = ["{{IMAGEN_DERECHA}}", "{{IMAGEN_IZQUIERDA}}"]
+                
+                for marcador in marcadores_imagen:
+                    if marcador in texto_completo:
+                        # Si se especifica una alineación especial en el marcador
+                        alineacion = get_alineacion_texto(texto_completo)
+                        if alineacion is not None:
+                            parrafo.alignment = alineacion
+                        # Si no hay alineación especial, se mantiene la del párrafo
+                        return insertar_imagen(parrafo, r"C:\Users\yampi\Downloads\firma.jpg")
+
+                # Proceder con el reemplazo normal de texto
+                for placeholder, valor in datos.items():
+                    texto_completo = texto_completo.replace(placeholder, valor)
+                
+                # Si el texto no ha cambiado, no hacemos nada
+                if texto_completo == "".join(run.text for run in parrafo.runs):
+                    return False
+                
+                # Limpiar el párrafo actual
+                for run in parrafo.runs:
+                    run.text = ""
+                
+                # Agregar el nuevo texto con el formato original
+                if texto_completo:
+                    run = parrafo.add_run(texto_completo)
+                    run.font.name = 'Arial'
+                    run.font.size = Pt(12)
+                
+                return True
+
+            # Procesar todos los párrafos del documento
+            for parrafo in contrato.paragraphs:
+                reemplazar_en_parrafo(parrafo)
+
+            # Procesar todas las tablas del documento
+            for tabla in contrato.tables:
+                for fila in tabla.rows:
+                    for celda in fila.cells:
+                        for parrafo in celda.paragraphs:
+                            reemplazar_en_parrafo(parrafo)
+
+            # Guardar el documento modificado
+            contrato.save(docx_temp.name)
+
+        # Crear archivo temporal para PDF
+        pdf_temp = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+        pdf_temp.close()
+
+        # Convertir DOCX a PDF
+        try:
+            convert(docx_temp.name, pdf_temp.name)
+        except Exception as e:
+            print(f"Error en la conversión de DOCX a PDF: {str(e)}")
+            raise
+
+        # Leer el PDF generado
+        with open(pdf_temp.name, 'rb') as pdf_file:
+            pdf_content = pdf_file.read()
+
+        # Limpiar archivos temporales
+        os.unlink(docx_temp.name)
+        os.unlink(pdf_temp.name)
+
+        # Crear buffer en memoria y devolver el PDF
+        buffer = io.BytesIO(pdf_content)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'Contrato_{id}.pdf'
+        )
+
+    except Exception as e:
+        return f"Error al generar el PDF: {str(e)}", 500
+    
+    finally:
+        pythoncom.CoUninitialize()
+
+
 @app.route("/list_credito/<int:id>", methods=["GET"])
 @check_db_connection
 @login_required
@@ -968,6 +1198,8 @@ def list_all_credito():
     usuarios_por_pagina = 10
     
     filtro_usuario = request.args.get("filtro_usuario", "").strip()
+    fecha_inicio = request.args.get("fecha_inicio", "").strip()
+    fecha_fin = request.args.get("fecha_fin", "").strip()
 
     try:
         # Consulta para obtener el número total de registros
@@ -996,9 +1228,11 @@ def list_all_credito():
         # Aplicar filtros dinámicos
         if filtro_usuario:
             query_sql = query_sql.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
-            
+        if fecha_inicio and fecha_fin:
+            query_sql = query_sql.filter(Creditos.fecha_credito.between(fecha_inicio, fecha_fin))
+    
         # Calcular la suma total del monto de la cuota según el filtro
-        suma_monto = query_sql.with_entities(db.func.sum(Pagos.monto_cuota)).scalar() or 0
+        suma_monto = query_sql.with_entities(db.func.sum(Creditos.monto_credito)).scalar() or 0
 
 
         # Para obtener el total de usuarios
@@ -1022,6 +1256,9 @@ def list_all_credito():
             total_usuarios=total_usuarios,
             total_paginas=total_paginas,
             usuarios_por_pagina=usuarios_por_pagina,
+            fecha_inicio=fecha_inicio, 
+            fecha_fin=fecha_fin,
+            filtro_usuario=filtro_usuario,
             paginas_visibles=paginas_visibles,
             suma_monto=suma_monto
         ), 200
@@ -1036,9 +1273,105 @@ def list_all_credito():
             total_usuarios=0,
             total_paginas=0,
             usuarios_por_pagina=usuarios_por_pagina,
+            fecha_inicio=fecha_inicio, 
+            fecha_fin=fecha_fin,
             paginas_visibles=[],
             suma_monto=0
         ), 200
+
+@app.route('/download_creditos', methods=['GET'])
+@check_db_connection
+@login_required
+def download_creditos():
+    fecha_inicio = request.args.get("fecha_inicio", "")
+    fecha_fin = request.args.get("fecha_fin", "")
+    filtro_usuario = request.args.get("filtro_usuario", "").strip()
+
+    try:
+        # Realizamos los JOIN para incluir la información del usuario y de la modalidad de pago
+        query = Creditos.query.join(Creditos.usuario).join(Creditos.modalidad_pago)
+
+        # Filtro por rango de fechas en Creditos.fecha_credito
+        if fecha_inicio and fecha_fin:
+            fecha_inicio_dt = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+            fecha_fin_dt = datetime.strptime(fecha_fin, "%Y-%m-%d")
+            query = query.filter(Creditos.fecha_credito.between(fecha_inicio_dt, fecha_fin_dt))
+
+        # Filtro por nombre de usuario (campo de la tabla Usuarios)
+        if filtro_usuario:
+            query = query.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
+
+        # Obtener los resultados
+        data = query.all()
+
+        # Crear un archivo Excel en memoria
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet()
+
+        # Formatos para la cabecera y fechas
+        header_format = workbook.add_format({'bold': True, 'align': 'center', 'border': 1})
+        date_format = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+        datetime_format = workbook.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss'})
+
+        # Encabezados del Excel
+        headers = [
+            'ID', 'USUARIO', 'CREDITO', 'INTERES', 'CUOTAS', 'MODALIDAD',
+            'GANANCIA', 'FECHA CREDITO', 'FECHA CREACION', 'FECHA ACTUALIZACION', 'HABILITADO'
+        ]
+        for col_num, header in enumerate(headers):
+            worksheet.write(0, col_num, header, header_format)
+
+        # Preparar los datos para escribirlos en el Excel
+        row_data = []
+        for credito in data:
+            row = [
+                credito.id_credito,
+                credito.usuario.nombre_completo,        # Obtenemos el nombre desde Usuarios
+                credito.monto_credito,
+                credito.tasa_interes,
+                credito.numero_cuotas,
+                credito.modalidad_pago.nombre_modalidad,  # Obtenemos el nombre de la modalidad
+                credito.ganancia_total,
+                credito.fecha_credito,
+                credito.fecha_creacion,
+                credito.fecha_actualizacion,
+                'Sí' if credito.habilitado else 'No'
+            ]
+            row_data.append(row)
+
+        # Escribir cada fila en el Excel
+        for row_num, row in enumerate(row_data, start=1):
+            for col_num, cell_data in enumerate(row):
+                if isinstance(cell_data, datetime):
+                    # Seleccionamos el formato adecuado según si tiene hora o no
+                    if cell_data.hour == 0 and cell_data.minute == 0 and cell_data.second == 0:
+                        worksheet.write_datetime(row_num, col_num, cell_data, date_format)
+                    else:
+                        worksheet.write_datetime(row_num, col_num, cell_data, datetime_format)
+                elif isinstance(cell_data, date) and not isinstance(cell_data, datetime):
+                    worksheet.write_datetime(row_num, col_num, datetime.combine(cell_data, datetime.min.time()), date_format)
+                elif cell_data is None:
+                    worksheet.write(row_num, col_num, '')
+                else:
+                    worksheet.write(row_num, col_num, cell_data)
+
+        # Ajustar automáticamente el ancho de las columnas según el contenido
+        for col_num in range(len(headers)):
+            max_length = max(len(str(row[col_num])) for row in row_data) + 5
+            worksheet.set_column(col_num, col_num, max_length)
+
+        # Cerrar el libro y preparar la respuesta
+        workbook.close()
+        output.seek(0)
+        return Response(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={"Content-Disposition": "attachment;filename=creditos.xlsx"}
+        )
+    except Exception as e:
+        print("Error al generar el archivo Excel:", e)
+        return "Error al generar el archivo Excel", 500
 
 
 @app.route("/list_all_pagos", methods=["GET"])
@@ -1051,6 +1384,8 @@ def list_all_pagos():
     # Filtros opcionales
     filtro_usuario = request.args.get("filtro_usuario", "").strip()
     filtro_estado = request.args.get("filtro_estado", "").strip()
+    fecha_inicio = request.args.get("fecha_inicio", "").strip()
+    fecha_fin = request.args.get("fecha_fin", "").strip()
 
     try:
         query = db.session.query(
@@ -1078,7 +1413,9 @@ def list_all_pagos():
             query = query.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
         if filtro_estado:
             query = query.filter(EstadosDeuda.nombre_estado.ilike(f"%{filtro_estado}%"))
-            
+        if fecha_inicio and fecha_fin:
+            query = query.filter(Pagos.fecha_pago_programada.between(fecha_inicio, fecha_fin))
+    
          # Calcular la suma total del monto de la cuota según el filtro
         suma_monto = query.with_entities(db.func.sum(Pagos.monto_cuota)).scalar() or 0
 
@@ -1103,6 +1440,8 @@ def list_all_pagos():
             usuarios_por_pagina=usuarios_por_pagina,
             filtro_usuario=filtro_usuario,
             filtro_estado=filtro_estado,
+            fecha_inicio=fecha_inicio, 
+            fecha_fin=fecha_fin,
             paginas_visibles=paginas_visibles,
             suma_monto=suma_monto  # Pasar la suma a la plantilla
 
@@ -1119,11 +1458,103 @@ def list_all_pagos():
             usuarios_por_pagina=usuarios_por_pagina,
             filtro_usuario=filtro_usuario,
             filtro_estado=filtro_estado,
+            fecha_inicio=fecha_inicio, 
+            fecha_fin=fecha_fin,
             paginas_visibles=[],
             suma_monto=suma_monto  # Pasar la suma a la plantilla
 
         ), 200
 
+@app.route('/download_pagos', methods=['GET'])
+@check_db_connection
+@login_required
+def download_pagos():
+    try:
+        
+        query = Pagos.query.join(Pagos.credito).join(Creditos.usuario).join(Pagos.estado_deuda)
+        
+        # Si deseas aplicar filtros, por ejemplo por fecha programada, podrías hacerlo así:
+        filtro_usuario = request.args.get("filtro_usuario", "").strip()
+        fecha_inicio = request.args.get("fecha_inicio", "")
+        fecha_fin = request.args.get("fecha_fin", "")
+        if fecha_inicio and fecha_fin:
+            fecha_inicio_dt = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+            fecha_fin_dt = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+            query = query.filter(Pagos.fecha_pago_programada.between(fecha_inicio_dt, fecha_fin_dt))
+        if filtro_usuario:
+            query = query.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
+        
+        # Obtener todos los registros
+        data = query.all()
+        
+        # Crear un archivo Excel en memoria
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet()
+        
+        # Formatos para cabecera y fechas
+        header_format = workbook.add_format({'bold': True, 'align': 'center', 'border': 1})
+        date_format = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+        datetime_format = workbook.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss'})
+        
+        # Definir los encabezados de las columnas
+        headers = [
+            'ID', 'Usuario', 'Cuota', 'Fecha programada', 'Fecha pago',
+            'Monto', 'Abono capital', 'Abono intereses', 'Estado', 'Días mora'
+        ]
+        for col_num, header in enumerate(headers):
+            worksheet.write(0, col_num, header, header_format)
+        
+        # Preparar los datos para cada fila
+        row_data = []
+        for pago in data:
+            row = [
+                pago.id_pago,
+                pago.credito.usuario.nombre_completo,    # Obtiene el nombre del usuario
+                pago.numero_cuota,
+                pago.fecha_pago_programada,               # Tipo date
+                pago.fecha_pago_real,                     # Tipo date (o None)
+                pago.monto_cuota,
+                pago.abono_capital,
+                pago.abono_intereses,
+                pago.estado_deuda.nombre_estado,          # Estado del pago (Pagado, Pendiente, Vencido)
+                pago.dias_mora
+            ]
+            row_data.append(row)
+        
+        # Escribir los datos en la hoja de cálculo
+        for row_num, row in enumerate(row_data, start=1):
+            for col_num, cell_data in enumerate(row):
+                # Si se trata de un objeto datetime o date se formatea adecuadamente
+                if isinstance(cell_data, datetime):
+                    if cell_data.hour == 0 and cell_data.minute == 0 and cell_data.second == 0:
+                        worksheet.write_datetime(row_num, col_num, cell_data, date_format)
+                    else:
+                        worksheet.write_datetime(row_num, col_num, cell_data, datetime_format)
+                elif isinstance(cell_data, date) and not isinstance(cell_data, datetime):
+                    worksheet.write_datetime(row_num, col_num, datetime.combine(cell_data, datetime.min.time()), date_format)
+                elif cell_data is None:
+                    worksheet.write(row_num, col_num, '')
+                else:
+                    worksheet.write(row_num, col_num, cell_data)
+        
+        # Ajustar el ancho de las columnas según el contenido
+        for col_num in range(len(headers)):
+            max_length = max(len(str(row[col_num])) for row in row_data) + 5
+            worksheet.set_column(col_num, col_num, max_length)
+        
+        # Finalizar y preparar el archivo para enviar
+        workbook.close()
+        output.seek(0)
+        
+        return Response(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={"Content-Disposition": "attachment;filename=pagos.xlsx"}
+        )
+    except Exception as e:
+        print("Error al generar el archivo Excel de pagos:", e)
+        return "Error al generar el archivo Excel de pagos", 500
 
 
 @app.route("/history_user/<int:id>", methods=["GET", "POST"])
@@ -1338,3 +1769,41 @@ def gestionar_archivo(id_usuario):
             return jsonify({'message': 'Archivo guardado correctamente'}), 200
         else:
             return jsonify({'message': 'Formato de archivo no permitido. Solo se aceptan PDFs.'}), 400
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.route('/pago/<int:id_pago>/archivo', methods=['GET', 'POST'])
+def gestionar_pago(id_pago):
+    # Ruta completa del archivo
+    filepath = os.path.join(UPLOAD_FOLDER_PAGOS, f"{id_pago}.jpg")
+
+    if request.method == 'GET':
+        # Descargar el archivo si existe
+        if os.path.exists(filepath):
+            return send_file(filepath, as_attachment=True, download_name=f"{id_pago}.jpg")
+        else:
+            # Responder con 404 si no se encuentra el archivo
+            return jsonify({'message': 'Archivo no encontrado'}), 404
+
+    if request.method == 'POST':
+        # Subir o reemplazar el archivo
+        if 'file' not in request.files:
+            return jsonify({'message': 'No se envió ningún archivo'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'message': 'Nombre de archivo inválido'}), 400
+
+        if file.filename != '' and allowed_file(file.filename):
+             # Convertir la imagen a un formato estándar (JPEG)
+            image = Image.open(file)
+            filepath = os.path.join(UPLOAD_FOLDER_PAGOS, f"{id}.jpg")  # Guardar como JPG
+            
+            # Convertir y guardar la imagen en JPEG
+            image.convert('RGB').save(filepath, "JPEG")
+            return jsonify({'message': 'Archivo guardado correctamente'}), 200
+        else:
+            return jsonify({'message': 'Formato de archivo no permitido. Solo se aceptan imagenes.'}), 400

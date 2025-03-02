@@ -150,6 +150,7 @@ class Pagos(db.Model):
     id_estado_deuda = db.Column(db.Integer, db.ForeignKey('EstadosDeuda.id_estado'), nullable=False)
     dias_mora = db.Column(db.Integer, nullable=True, default=0)
     habilitado = db.Column(db.Boolean, default=True)
+    medio = db.Column(db.String(255), nullable=False)
 
     # Relación con Creditos
     credito = db.relationship('Creditos', back_populates='pagos')
@@ -248,6 +249,8 @@ class Usuarios(db.Model):
     direccion = db.Column(db.String(255), nullable=False)
     celular = db.Column(db.String(20), nullable=False)
     correo = db.Column(db.String(100), nullable=False)
+    expedicion = db.Column(db.String(100), nullable=False)
+    residencia = db.Column(db.String(100), nullable=False)
     habilitado = db.Column(db.Boolean, default=True)
     fecha_creacion = db.Column(
         db.DateTime,

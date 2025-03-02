@@ -87,7 +87,15 @@
                 <label for="filtro_usuario">Usuario:</label>
                 <input placeholder="Buscar usuario por nombre" type="text" id="filtro_usuario" name="filtro_usuario" value="{{ filtro_usuario }}" class="form-card__input-inline">
                 
+                <label for="fecha_inicio">Desde:</label>
+                <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-card__input-inline">
+
+                <label for="fecha_fin">Hasta:</label>
+                <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="form-card__input-inline">
+                
                 <button type="submit" class="btn btn--green">Filtrar</button>
+                <a href="{{ url_for('download_creditos', fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, filtro_usuario=filtro_usuario) }}" class="btn btn--blue">Descargar Excel</a>
+
             </div>
         </form>
 
@@ -157,13 +165,13 @@
             <!-- Controles de Paginación -->
             <div class="pagination">
                 {% if pagina_actual > 1 %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual - 1 }}">&laquo; Anterior</a>
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual - 1 }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">&laquo; Anterior</a>
                 {% endif %}
                 {% for pagina in paginas_visibles %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
                 {% endfor %}
                 {% if pagina_actual < total_paginas %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual + 1 }}">Siguiente &raquo;</a>
+                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual + 1 }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">Siguiente &raquo;</a>
                 {% endif %}
             </div>
         </div>

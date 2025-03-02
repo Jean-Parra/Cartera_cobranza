@@ -78,7 +78,9 @@
         </div>
     </nav>
     <div class="container">
+        
         <h1 class="title">Lista de creditos</h1>
+
             
 
         <!-- Tabla de usuarios -->
@@ -95,6 +97,7 @@
                     <th>Fecha Credito</th>
                     <th>Fecha Creación</th>
                     <th>Fecha Actualización</th>
+                    <th>Contrato</th>
                     <th>Editar</th>
                     <th>Detalles</th>
                     <th>Eliminar</th>
@@ -114,6 +117,18 @@
                     <td data-label="Fecha Credito">{{ user.fecha_credito if user.fecha_credito else ''}}</td>
                     <td data-label="Fecha Creación">{{ user.fecha_creacion if user.fecha_creacion else ''}}</td>
                     <td data-label="Fecha Actualización">{{ user.fecha_actualizacion if user.fecha_actualizacion else ''}}</td>
+                    
+                    <td data-label="Contrato"> 
+                        <form action="{{ url_for('download_pdf', id=user.id_credito) }}" method="post" target="_blank">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />          
+                            
+                            <button class="contratoBtn" type="submit" data-id="{{ user.id_credito }}">
+                                <img src="../static/icons/envelope-paper.svg" alt="PDF icon" class="icon" />
+                            </button>
+                        </form>
+                    </td>
+                    
+                    
                     <td data-label="Editar" data-id="{{ user.id_credito }}">
                         <a href="{{ url_for('update_credito', id=user.id_credito) }}">
                             <img src="../static/icons/pencil.svg" alt="info icon" class="icon" />
