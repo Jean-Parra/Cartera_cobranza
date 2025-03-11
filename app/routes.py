@@ -1896,12 +1896,38 @@ def send_notification(target_user_id, message, credit_id=None):
     db.session.add(notification)
     db.session.commit()
 
-# Endpoint para listar notificaciones (para el administrador)
+
 @app.route("/notificaciones")
 @login_required
 def notifications():
-    notifications = Notification.query.filter_by(user_id=1).order_by(Notification.fecha_creacion.desc()).all()
-    return render_template("notificaciones.html", notifications=notifications)
+    # Número de página actual (por defecto 1)
+    pagina_actual = request.args.get("pagina", default=1, type=int)
+    notificaciones_por_pagina = 10
+
+    # Consulta: se filtran las notificaciones del administrador (user_id = 1)
+    # y se ordenan de la más reciente a la más antigua
+    query = Notification.query.filter_by(user_id=1)\
+                .order_by(Notification.fecha_creacion.desc())
+    
+    total_notificaciones = query.count()
+    total_paginas = (total_notificaciones - 1) // notificaciones_por_pagina + 1
+    inicio = (pagina_actual - 1) * notificaciones_por_pagina
+    notificaciones_paginadas = query.offset(inicio).limit(notificaciones_por_pagina).all()
+
+    # Definir un rango de páginas visibles, por ejemplo, 2 antes y 2 después de la actual
+    paginas_visibles = [
+        pagina for pagina in range(
+            max(1, pagina_actual - 2),
+            min(total_paginas + 1, pagina_actual + 3)
+        )
+    ]
+
+    return render_template("notificaciones.html",
+                           notifications=notificaciones_paginadas,
+                           pagina_actual=pagina_actual,
+                           paginas_visibles=paginas_visibles,
+                           total_paginas=total_paginas), 200
+
 
 
 # Eventos de Socket.IO para la conexión y desconexión

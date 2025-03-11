@@ -1,13 +1,16 @@
 // Variable global para saber si se desbloqueó el audio
 let audioUnlocked = false;
 
-// Escucha el primer clic del usuario para desbloquear el audio
+// Escucha el primer clic del usuario para desbloquear el audio de forma silenciosa
 document.addEventListener('click', function unlockAudio() {
-  // Intentamos reproducir el audio para "desbloquearlo"
   const dummyAudio = new Audio('/static/sounds/Campanita.mp3');
+  dummyAudio.volume = 0; // Reproduce el audio de forma silenciosa
   dummyAudio.play().then(() => {
     audioUnlocked = true;
-    console.log("Audio desbloqueado");
+    // Pausar y resetear para no reproducir nada
+    dummyAudio.pause();
+    dummyAudio.currentTime = 0;
+    console.log("Audio desbloqueado silenciosamente");
   }).catch(err => {
     console.error("Error al desbloquear audio:", err);
   });
