@@ -1,31 +1,28 @@
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import io
 import os
-import subprocess
 from docx import Document
 from flask import Response, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user,login_required, login_user, logout_user
 import numpy_financial as npf
 import xlsxwriter
-from app import app, db, s
+from app import app, db, s, socketio, current_active_users
 from app.metodos import send_email_amazon
-from app.models import Administradores, Auditoria, Creditos, EstadosDeuda, ModalidadesPago, Pagos, Usuarios
-from sqlalchemy import or_, text
+from app.models import Administradores, Auditoria, Creditos, EstadosDeuda, ModalidadesPago, Notification, Pagos, Usuarios
+from sqlalchemy import text
 from functools import wraps
 from werkzeug.utils import secure_filename
 
-from docx2pdf import convert
-import pythoncom
 import tempfile
 from num2words import num2words
 from docx.shared import Inches
 
-
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from PIL import Image
-
-
+import subprocess
+import time
 # Ruta base del directorio actual
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -37,6 +34,34 @@ UPLOAD_FOLDER_PAGOS = os.path.join(BASE_DIR, '..', 'images')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_PAGOS, exist_ok=True)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+
+
+def convert_to_pdf(docx_path, output_dir):
+    try:
+        result = subprocess.run([
+            "libreoffice", "--headless", "--convert-to", "pdf",
+            "--outdir", output_dir, docx_path
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+
+        print("Salida estándar:", result.stdout)
+        print("Error estándar:", result.stderr)
+
+        pdf_filename = os.path.splitext(os.path.basename(docx_path))[0] + ".pdf"
+        pdf_path = os.path.join(output_dir, pdf_filename)
+
+        if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
+            raise RuntimeError("La conversión a PDF falló o el archivo está vacío.")
+
+        return pdf_path
+    except subprocess.CalledProcessError as e:
+        print(f"Error al convertir con LibreOffice: {e.stderr}")
+        return None
+    except Exception as e:
+        print(f"Error general: {str(e)}")
+        return None
+
+
 
 def check_db_connection(f):
     @wraps(f)
@@ -195,6 +220,32 @@ def payment(id):
             pago.id_estado_deuda = 2
             db.session.commit()
             
+            # Verificar si es la primera cuota
+            if pago.numero_cuota == 1:
+                # Obtener la modalidad desde la tabla Creditos
+                credito = Creditos.query.filter_by(id_credito=pago.id_credito).first()
+                if credito:
+                    modalidad = credito.id_modalidad_pago
+                    fecha_inicio = fecha_pago_real_date
+
+                    # Actualizar las fechas programadas para las demás cuotas
+                    pagos = Pagos.query.filter(
+                        Pagos.id_credito == pago.id_credito,
+                        Pagos.numero_cuota > 1
+                    ).order_by(Pagos.numero_cuota).all()
+
+                    for i, cuota in enumerate(pagos, start=1):
+                        if modalidad == 1:  # Diario
+                            cuota.fecha_pago_programada = fecha_inicio + timedelta(days=i)
+                        elif modalidad == 2:  # Semanal
+                            cuota.fecha_pago_programada = fecha_inicio + timedelta(weeks=i)
+                        elif modalidad == 3:  # Quincenal
+                            cuota.fecha_pago_programada = fecha_inicio + timedelta(days=15 * i)
+                        elif modalidad == 4:  # Mensual
+                            cuota.fecha_pago_programada = fecha_inicio + relativedelta(months=i)
+
+                    db.session.commit()
+                
              
             cambios = {
                 "id credito": id_credito,
@@ -247,7 +298,26 @@ def register_credito(id):
     modalidades = query.all()
 
     if request.method == "POST":
-        amount = int(request.form.get("amount").replace('.', ''))  # Monto del crédito
+        # Nuevo campo para seleccionar el tipo de crédito
+        credit_type = request.form.get("credit_type")  # 'normal' o 'consular'
+        
+        # Cantidad de adultos y niños
+        adults = int(request.form.get("adults", 0))
+        children = int(request.form.get("children", 0))
+        total_people = adults + children
+
+        # Calcular el costo del servicio
+        service_cost = (adults * 1096000) + (children * 694000)
+
+        if credit_type == 'consular':
+            # Para crédito con costos consulares, se suma:
+            # (costos consulares - anticipo) por persona = 447500
+            amount = service_cost + (total_people * 447500)
+        else:
+            # Para crédito normal se descuenta 100000 por persona
+            amount = service_cost - (total_people * 100000)
+            amount = max(0, amount)  # evitar monto negativo
+        
         monthly_interest_rate = float(request.form.get("interest_rate").replace(',', '.'))  # Tasa de interés mensual
         installments = int(request.form.get("installments"))  # Número de cuotas
         modalidad = int(request.form.get("modalidad"))  # Modalidad de pago
@@ -278,7 +348,8 @@ def register_credito(id):
                 numero_cuotas=installments,
                 id_modalidad_pago=modalidad,
                 fecha_credito=date_start,
-                ganancia_total=total_ganancia
+                ganancia_total=total_ganancia,
+                tipo=credit_type
             )
             db.session.add(nuevo_credito)
             db.session.commit()
@@ -307,9 +378,11 @@ def register_credito(id):
                 elif modalidad == 2:  # Semanal
                     fecha_programada = date_start + timedelta(weeks=i)
                 elif modalidad == 3:  # Quincenal
-                    fecha_programada = date_start + timedelta(weeks=2 * i)
+                    # Suma 15 días para cada incremento
+                    fecha_programada = date_start + timedelta(days=15 * i)
                 elif modalidad == 4:  # Mensual
-                    fecha_programada = date_start + timedelta(weeks=4 * i)
+                    # Suma i meses de forma exacta
+                    fecha_programada = date_start + relativedelta(months=i)
 
                 # Registrar el pago en la base de datos
                 pagos = Pagos(
@@ -335,7 +408,8 @@ def register_credito(id):
                 "Tasa de interes": monthly_interest_rate,
                 "Número de cuotas": installments,
                 "Modalidad": nombre_modalidad,
-                "Fecha de credito": fecha_date
+                "Fecha de credito": fecha_date,
+                "Tipo": credit_type
             }
 
             auditoria = Auditoria(
@@ -348,7 +422,15 @@ def register_credito(id):
             db.session.add(auditoria)
             db.session.commit()
             mostrar_exito = True
-
+            
+            # Si el crédito es de tipo consular, enviar notificación al admin (ID 1)
+            if credit_type == 'consular':
+                print("hola")
+                message = f"Nuevo crédito consular registrado para {nombre_completo}."
+                target_user_id = 1  # Siempre se envía al administrador con ID 1
+                send_notification(target_user_id, message, credit_id=nuevo_credito.id_credito)
+            else:
+                print("chao")
         except Exception as error:
             print("Error al insertar datos en la tabla usuarios:", error)
 
@@ -944,7 +1026,6 @@ def list_pagos(id):
 
 @app.route('/download-pdf/<int:id>', methods=['POST'])
 def download_pdf(id):
-    pythoncom.CoInitialize()
     
     try:
         credito = Creditos.query.get_or_404(id)
@@ -993,7 +1074,7 @@ def download_pdf(id):
         }
 
         with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as docx_temp:
-            contrato = Document(r"C:\Users\yampi\Downloads\CONTRATO DE PRESTACIÓN DE SERVICIOS DE FINANCIAMIENTO.docx")
+            contrato = Document("CONTRATO_DE_PRESTACION_DE_SERVICIOS_DE_FINANCIAMIENTO.docx")
 
             def insertar_imagen(parrafo, imagen_path):
                 """
@@ -1045,7 +1126,7 @@ def download_pdf(id):
                         if alineacion is not None:
                             parrafo.alignment = alineacion
                         # Si no hay alineación especial, se mantiene la del párrafo
-                        return insertar_imagen(parrafo, r"C:\Users\yampi\Downloads\firma.jpg")
+                        return insertar_imagen(parrafo, "firma.jpg")
 
                 # Proceder con el reemplazo normal de texto
                 for placeholder, valor in datos.items():
@@ -1081,26 +1162,18 @@ def download_pdf(id):
             # Guardar el documento modificado
             contrato.save(docx_temp.name)
 
-        # Crear archivo temporal para PDF
         pdf_temp = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
         pdf_temp.close()
+        pdf_path = convert_to_pdf(docx_temp.name, os.path.dirname(pdf_temp.name))
+        if not pdf_path:
+            raise Exception("Error en la conversión de DOCX a PDF")
 
-        # Convertir DOCX a PDF
-        try:
-            convert(docx_temp.name, pdf_temp.name)
-        except Exception as e:
-            print(f"Error en la conversión de DOCX a PDF: {str(e)}")
-            raise
-
-        # Leer el PDF generado
-        with open(pdf_temp.name, 'rb') as pdf_file:
+        with open(pdf_path, 'rb') as pdf_file:
             pdf_content = pdf_file.read()
 
-        # Limpiar archivos temporales
         os.unlink(docx_temp.name)
-        os.unlink(pdf_temp.name)
+        os.unlink(pdf_path)
 
-        # Crear buffer en memoria y devolver el PDF
         buffer = io.BytesIO(pdf_content)
         buffer.seek(0)
 
@@ -1111,11 +1184,10 @@ def download_pdf(id):
             download_name=f'Contrato_{id}.pdf'
         )
 
+
     except Exception as e:
         return f"Error al generar el PDF: {str(e)}", 500
     
-    finally:
-        pythoncom.CoUninitialize()
 
 
 @app.route("/list_credito/<int:id>", methods=["GET"])
@@ -1807,3 +1879,40 @@ def gestionar_pago(id_pago):
             return jsonify({'message': 'Archivo guardado correctamente'}), 200
         else:
             return jsonify({'message': 'Formato de archivo no permitido. Solo se aceptan imagenes.'}), 400
+        
+        
+# Función para enviar notificaciones
+def send_notification(target_user_id, message, credit_id=None):
+    print("aaaaaa")
+    if str(target_user_id) in current_active_users:
+        socketio.emit('notification', {'message': message, 'credit_id': credit_id}, room=str(target_user_id))
+        
+    notification = Notification(
+        user_id=target_user_id,
+        message=message,
+        credit_id=credit_id,
+        status='pendiente'
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+# Endpoint para listar notificaciones (para el administrador)
+@app.route("/notificaciones")
+@login_required
+def notifications():
+    notifications = Notification.query.filter_by(user_id=1).order_by(Notification.fecha_creacion.desc()).all()
+    return render_template("notificaciones.html", notifications=notifications)
+
+
+# Eventos de Socket.IO para la conexión y desconexión
+@socketio.on('join')
+def handle_join(user_id):
+    from flask_socketio import join_room
+    join_room(str(user_id))
+    current_active_users.add(str(user_id))
+    print(f"Usuario {user_id} se ha unido a su sala.")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    # Aquí deberías remover al usuario de current_active_users si tienes la información.
+    pass

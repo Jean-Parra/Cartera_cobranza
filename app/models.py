@@ -204,6 +204,7 @@ class Creditos(db.Model):
     )
     ganancia_total = db.Column(db.Integer, nullable=False)
     habilitado = db.Column(db.Boolean, default=True)
+    tipo = db.Column(db.String(50), nullable=False)
 
 
     # Relación con Usuarios
@@ -273,3 +274,20 @@ class Usuarios(db.Model):
     def __repr__(self):
         return f'<Usuarios {self.id_usuario}>'
 
+
+
+class Notification(db.Model):
+    __tablename__ = 'Notificaciones'
+    id_notificaciones = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    message = db.Column(db.String(255), nullable=False)
+    credit_id = db.Column(db.Integer, nullable=True)  # Referencia al id del crédito, si aplica
+    status = db.Column(db.String(20), default='pendiente')
+    fecha_creacion = db.Column(
+        db.DateTime,
+        nullable=True,
+        default=func.current_timestamp()
+    )
+    
+    def __repr__(self):
+        return f'<Notificaciones {self.id_notificaciones}>'

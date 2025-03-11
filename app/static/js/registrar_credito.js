@@ -1,6 +1,11 @@
 // Precios constantes
+// Función para calcular el monto total
+// Constantes de precios
 const ADULT_PRICE = 1096000;
 const CHILD_PRICE = 694000;
+const COSTOS_CONSULARES = 832500;
+const ANTICIPO = 385000;
+
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -46,7 +51,15 @@ const fields = {
     installments: false,
     modalidad: false,
     date_start: false,
+    credit_type: false
 };
+
+// Listener para el campo 'credit_type'
+document.getElementById('credit_type').addEventListener('change', (e) => {
+    fields.credit_type = e.target.value !== '';
+    e.target.parentElement.classList.toggle('form-card__group--incorrect', !fields.credit_type);
+    calculateAmount();
+});
 
 // Función para validar un campo específico
 const validateField = (fieldName, value) => {
@@ -59,16 +72,27 @@ const formatNumber = (number) => {
     return number.toLocaleString('es-CO');
 };
 
-// Función para calcular el monto total
+
 const calculateAmount = () => {
     const adults = parseInt(document.getElementById('adults').value) || 0;
     const children = parseInt(document.getElementById('children').value) || 0;
+    const creditType = document.getElementById('credit_type').value;
+    const serviceCost = (adults * ADULT_PRICE) + (children * CHILD_PRICE);
+    let totalAmount = 0;
+    const totalPeople = adults + children;
+
+    if (creditType === 'consular') {
+        // Se suma el costo consular menos el anticipo por persona: 832500 - 385000 = 447500
+        totalAmount = serviceCost + (totalPeople * 832500);
+    } else {
+        // Crédito normal: se descuenta 100000 por persona
+        totalAmount = serviceCost;
+    }
     
-    const totalAmount = (adults * ADULT_PRICE) + (children * CHILD_PRICE);
     document.getElementById('amount').value = formatNumber(totalAmount);
-    
     calculateProfit();
 };
+
 
 // Función para validar entrada de tasa de interés
 function validateInterestRateInput(input) {
