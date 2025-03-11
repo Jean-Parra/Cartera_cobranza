@@ -1,0 +1,13 @@
+pip install gunicorn
+pip install python-dotenv
+pip install --upgrade Flask-WTF
+pip install --upgrade Flask-Login
+pip install --upgrade Flask-SQLAlchemy
+pip install mysql-connector-python
+pip install python-dateutil
+pip install python-docx
+pip install boto3
+pip install num2words
+pip install Pillow
+pip install --upgrade XlsxWriter
+pip install flask-socketio eventlet

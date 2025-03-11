@@ -33,3 +33,4 @@ Thumbs.db
 # Ignora la carpeta trunk si estás usando Subversion o si es una carpeta de desarrollo
 trunk/
 .trunk
+.qodo

@@ -286,6 +286,7 @@ def payment(id):
 
 @app.route("/register_credito/<int:id>", methods=["GET", "POST"])
 @check_db_connection
+@login_required
 def register_credito(id):    
     mostrar_exito = False
     # Obtener el nombre completo del usuario usando el id
@@ -447,6 +448,7 @@ def register_credito(id):
 
 @app.route("/update_credito/<int:id>", methods=["GET", "POST"])
 @check_db_connection
+@login_required
 def update_credito(id):
     mostrar_exito = False
     mostrar_alerta = False
