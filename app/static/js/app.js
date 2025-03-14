@@ -63,3 +63,14 @@ socket.on('notification', (data) => {
     console.log("El audio no está desbloqueado; requiere interacción del usuario.");
   }
 });
+
+// Al cargar la página, obtén el número de notificaciones pendientes
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('/api/notificaciones_pendientes')
+    .then(response => response.json())
+    .then(data => {
+      const countElem = document.getElementById('notif-count');
+      countElem.textContent = data.pending_count;
+    })
+    .catch(err => console.error("Error al obtener notificaciones:", err));
+});

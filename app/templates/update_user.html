@@ -7,7 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
+    {% if current_user.id_administrador == 3%}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/notificaciones.css') }}">
+    {% endif %}
 
     <title>Reagendar: Actualizar usuario</title>
 </head>
@@ -132,48 +134,73 @@
             </div>
 
             <div class="form-card__group">
-                <label class="form-card__label" for="file">Pagaré:</label>
+                <label class="form-card__label" for="file">Archivos:</label>
                 <div id="file-actions" data-user-id="{{ user.id_usuario }}">
                     <!-- El contenido se llenará dinámicamente -->
                 </div>
             
                 <div id="upload-section">
-                    <input class="form-card__input" type="file" name="file" id="file" accept=".pdf">
+                    <input class="form-card__input" type="file" name="file" id="file" multiple>
+
                 </div>
             </div>
                 
             <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const userId = document.getElementById('file-actions').getAttribute('data-user-id');
-                const fileActionsDiv = document.getElementById('file-actions');
-                const uploadSection = document.getElementById('upload-section');
-                const fileInput = document.getElementById('file');
-                let fileExists = false;
-            
-                // Función para actualizar la interfaz según el estado del archivo
-                function updateInterface() {
-                    fetch(`/usuario/${userId}/archivo`, { method: 'GET' })
-                        .then(response => {
-                            fileExists = response.status === 200;
-                            
-                            if (fileExists) {
-                                fileActionsDiv.innerHTML = `
-                                    <a href="/usuario/${userId}/archivo" class="btn btn-download">Descargar Archivo</a>
-                                `;
+                document.addEventListener('DOMContentLoaded', function() {
+                    const userId = document.getElementById('file-actions').getAttribute('data-user-id');
+                    const fileActionsDiv = document.getElementById('file-actions');
+                    const csrfToken = "{{ csrf_token() }}";  // Asumiendo que usas Flask-WTF
+                
+                    function updateInterface() {
+                        fetch(`/usuario/${userId}/archivos`, { method: 'GET' })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('No se pudieron obtener los archivos');
+                                }
+                                return response.json();
+                            })
+                            .then(archivos => {
+                                if (Array.isArray(archivos) && archivos.length > 0) {
+                                    let html = '<ul>';
+                                    archivos.forEach(archivo => {
+                                        html += `<li>
+                                                    <a href="/usuario/${userId}/archivo/${archivo}" class="btn btn-download">
+                                                        ${archivo}
+                                                    </a>
+                                                    <button onclick="deleteFile('${archivo}')" class="btn btn-delete">Eliminar</button>
+                                                </li>`;
+                                    });
+                                    html += '</ul>';
+                                    fileActionsDiv.innerHTML = html;
+                                } else {
+                                    fileActionsDiv.innerHTML = `<p>No hay archivos subidos.</p>`;
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error al verificar archivos:', error);
+                                fileActionsDiv.innerHTML = `<p>Error al cargar archivos.</p>`;
+                            });
+                    }
+                
+                    window.deleteFile = function(filename) {
+                        fetch(`/usuario/${userId}/archivo/${filename}`, {
+                            method: 'DELETE',
+                            headers: {
+                                "X-CSRFToken": csrfToken
                             }
                         })
-                        .catch(error => console.error('Error al verificar archivo:', error));
-                }
-            
-
-                // Inicializar la interfaz
-                updateInterface();
-            });
-            </script>
+                        .then(response => response.json())
+                        .then(result => {
+                            alert(result.message);
+                            updateInterface();
+                        })
+                        .catch(error => console.error('Error al eliminar archivo:', error));
+                    };
                 
-            
-            
-            
+                    updateInterface();
+                });
+                </script>
+                 
             
             
             
@@ -199,10 +226,12 @@
         
     </div>
     <!-- Contenedor para los toasts -->
+  {% if current_user.id_administrador == 3%}
   <div id="toast-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% endif %}
     <script src="{{ url_for('static', filename='js/actualizar_usuario.js') }}" type="module"></script>
 
 

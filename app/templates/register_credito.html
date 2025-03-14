@@ -7,7 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
+    {% if current_user.id_administrador == 3%}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/notificaciones.css') }}">
+    {% endif %}
 
     <title>Reagendar: Registro de usuarios</title>
 </head>
@@ -244,10 +246,12 @@
         </form>
     </div>
     <!-- Contenedor para los toasts -->
+  {% if current_user.id_administrador == 3%}
   <div id="toast-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% endif %}
     <script src="{{ url_for('static', filename='js/registrar_credito.js') }}" type="module"></script>
 
 

@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <title>Mi Aplicación</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/notificaciones.css') }}">
+  {% if current_user.id_administrador == 3%}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/notificaciones.css') }}">
+    {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
 </head>
 <body>
@@ -110,9 +112,11 @@
 
 
   <!-- Contenedor para los toasts -->
+  {% if current_user.id_administrador == 3%}
   <div id="toast-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% endif %}
 </body>
 </html>

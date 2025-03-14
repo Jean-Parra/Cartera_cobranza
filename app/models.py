@@ -288,6 +288,12 @@ class Notification(db.Model):
         nullable=True,
         default=func.current_timestamp()
     )
+    fecha_actualizacion = db.Column(
+        db.DateTime,
+        nullable=True,
+        default=func.current_timestamp(),
+        onupdate=func.current_timestamp()
+    )
     
     def __repr__(self):
         return f'<Notificaciones {self.id_notificaciones}>'

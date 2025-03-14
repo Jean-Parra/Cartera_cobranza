@@ -1724,16 +1724,18 @@ def update_user(id):
         else:
             mostrar_exito = False  # No hubo cambios, por lo que no se muestra éxito
             
-        # Verificar si se ha subido un archivo
+        # Procesar subida de múltiples archivos (por ejemplo, PDFs)
         if 'file' in request.files:
-            file = request.files['file']
-            if file.filename != '':
-                # Asegurarse de que el nombre del archivo sea seguro
-                filename = secure_filename(file.filename)
-                # Guardar el archivo con el nombre ID_USUARIO.pdf
-                filepath = os.path.join('pdfs', f"{id}.pdf")
-                file.save(filepath)
-                mostrar_exito = True
+            files = request.files.getlist('file')
+            for file in files:
+                if file.filename != '':
+                    # Asegurarse de que el nombre del archivo sea seguro
+                    filename = secure_filename(file.filename)
+                    # Generar un nombre único para cada archivo, ej: id_originalFilename.pdf
+                    unique_filename = f"{id}_{filename}"
+                    filepath = os.path.join('pdfs', unique_filename)
+                    file.save(filepath)
+                    mostrar_exito = True
 
             
 
@@ -1814,35 +1816,75 @@ def deshabilitar_credito(id):
         return "Método no permitido", 405  # Method Not Allowed
     
     
-@app.route('/usuario/<int:id_usuario>/archivo', methods=['GET', 'POST'])
-def gestionar_archivo(id_usuario):
-    # Ruta completa del archivo
-    filepath = os.path.join(UPLOAD_FOLDER, f"{id_usuario}.pdf")
+@app.route('/usuario/<int:id_usuario>/archivo', methods=['POST'])
+def subir_archivos(id_usuario):
+    if 'file' not in request.files:
+        return jsonify({'message': 'No se envió ningún archivo'}), 400
+    
+    files = request.files.getlist('file')
+    if not files:
+        return jsonify({'message': 'No se enviaron archivos válidos'}), 400
 
-    if request.method == 'GET':
-        # Descargar el archivo si existe
-        if os.path.exists(filepath):
-            return send_file(filepath, as_attachment=True, download_name=f"{id_usuario}.pdf")
-        else:
-            # Responder con 404 si no se encuentra el archivo
-            return jsonify({'message': 'Archivo no encontrado'}), 404
-
-    if request.method == 'POST':
-        # Subir o reemplazar el archivo
-        if 'file' not in request.files:
-            return jsonify({'message': 'No se envió ningún archivo'}), 400
-        
-        file = request.files['file']
+    saved_files = []
+    for file in files:
         if file.filename == '':
-            return jsonify({'message': 'Nombre de archivo inválido'}), 400
-
-        if file and file.filename.endswith('.pdf'):
-            # Guardar el archivo
-            filename = secure_filename(f"{id_usuario}.pdf")
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-            return jsonify({'message': 'Archivo guardado correctamente'}), 200
+            continue  # Omite archivos sin nombre
+        if file and file.filename.lower().endswith('.pdf'):
+            filename = secure_filename(file.filename)
+            # Genera un nombre único (por ejemplo, anteponiendo el id_usuario)
+            unique_filename = f"{id_usuario}_{filename}"
+            filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
+            file.save(filepath)
+            saved_files.append(unique_filename)
         else:
             return jsonify({'message': 'Formato de archivo no permitido. Solo se aceptan PDFs.'}), 400
+
+    if saved_files:
+        return jsonify({'message': 'Archivos guardados correctamente', 'archivos': saved_files}), 200
+    else:
+        return jsonify({'message': 'Ningún archivo válido fue subido'}), 400
+
+
+@app.route('/usuario/<int:id_usuario>/archivos', methods=['GET'])
+def listar_archivos(id_usuario):
+    try:
+        archivos = [
+            filename for filename in os.listdir(UPLOAD_FOLDER)
+            if (filename.startswith(f"{id_usuario}_") or filename.startswith(f"{id_usuario}."))
+        ]
+    except Exception as e:
+        return jsonify({'message': 'Error al listar archivos', 'error': str(e)}), 500
+
+    # Devuelve un array vacío en lugar de un 404 si no hay archivos
+    return jsonify(archivos), 200
+
+
+@app.route('/usuario/<int:id_usuario>/archivo/<filename>', methods=['GET'])
+def descargar_archivo(id_usuario, filename):
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if os.path.exists(filepath):
+        return send_file(filepath, as_attachment=True, download_name=filename)
+    else:
+        return jsonify({'message': 'Archivo no encontrado'}), 404
+
+
+@app.route('/usuario/<int:id_usuario>/archivo/<string:filename>', methods=['DELETE'])
+@login_required
+def eliminar_archivo(id_usuario, filename):
+    # Verificar que el archivo pertenezca al usuario mediante la convención de nombres (id_usuario_filename)
+    if not filename.startswith(f"{id_usuario}_"):
+        return jsonify({'message': 'No autorizado para eliminar este archivo.'}), 403
+
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if os.path.exists(filepath):
+        try:
+            os.remove(filepath)
+            return jsonify({'message': 'Archivo eliminado correctamente'}), 200
+        except Exception as e:
+            return jsonify({'message': 'Error al eliminar el archivo', 'error': str(e)}), 500
+    else:
+        return jsonify({'message': 'Archivo no encontrado'}), 404
+
 
 
 def allowed_file(filename):
@@ -1906,8 +1948,7 @@ def notifications():
     pagina_actual = request.args.get("pagina", default=1, type=int)
     notificaciones_por_pagina = 10
 
-    # Consulta: se filtran las notificaciones del administrador (user_id = 1)
-    # y se ordenan de la más reciente a la más antigua
+    # Consulta: se filtran las notificaciones del usuario actual y se ordenan de la más reciente a la más antigua
     query = Notification.query.filter_by(user_id=1)\
                 .order_by(Notification.fecha_creacion.desc())
     
@@ -1916,7 +1957,14 @@ def notifications():
     inicio = (pagina_actual - 1) * notificaciones_por_pagina
     notificaciones_paginadas = query.offset(inicio).limit(notificaciones_por_pagina).all()
 
-    # Definir un rango de páginas visibles, por ejemplo, 2 antes y 2 después de la actual
+    # Marcar todas las notificaciones pendientes como "leído" (o cambiar su estado)
+    pendientes = Notification.query.filter_by(user_id=1, status='pendiente').all()
+    for notif in pendientes:
+        notif.status = 'leido'
+    db.session.commit()
+
+
+    # Definir un rango de páginas visibles
     paginas_visibles = [
         pagina for pagina in range(
             max(1, pagina_actual - 2),
@@ -1932,6 +1980,7 @@ def notifications():
 
 
 
+
 # Eventos de Socket.IO para la conexión y desconexión
 @socketio.on('join')
 def handle_join(user_id):
@@ -1944,3 +1993,12 @@ def handle_join(user_id):
 def handle_disconnect():
     # Aquí deberías remover al usuario de current_active_users si tienes la información.
     pass
+
+@app.route("/api/notificaciones_pendientes")
+@login_required
+def api_notificaciones_pendientes():
+    pending_count = Notification.query.filter_by(
+        user_id=1,
+        status='pendiente'
+    ).count()
+    return jsonify({'pending_count': pending_count})
