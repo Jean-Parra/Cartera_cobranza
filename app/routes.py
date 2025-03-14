@@ -13,6 +13,7 @@ from app.models import Administradores, Auditoria, Creditos, EstadosDeuda, Modal
 from sqlalchemy import text
 from functools import wraps
 from werkzeug.utils import secure_filename
+from sqlalchemy import or_
 
 import tempfile
 from num2words import num2words
@@ -23,6 +24,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from PIL import Image
 import subprocess
 import time
+
 # Ruta base del directorio actual
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -763,9 +765,12 @@ def list_users():
         if filtro:
             
 
-            # Solo un dato: busca en ambos campos
             query = query.filter(
-                (Usuarios.nombre_completo.ilike(f"%{filtro}%"))
+                or_(
+                    Usuarios.nombre_completo.ilike(f"%{filtro}%"),
+                    Usuarios.cedula.ilike(f"%{filtro}%"),
+                    Usuarios.celular.ilike(f"%{filtro}%")
+                )
             )
             
         total_usuarios = query.count()  # Contar el total de usuarios después del filtro
@@ -1274,6 +1279,7 @@ def list_all_credito():
     filtro_usuario = request.args.get("filtro_usuario", "").strip()
     fecha_inicio = request.args.get("fecha_inicio", "").strip()
     fecha_fin = request.args.get("fecha_fin", "").strip()
+    filtro_tipo = request.args.get("filtro_tipo", "").strip()  # Nuevo parámetro para filtrar por tipo
 
     try:
         # Consulta para obtener el número total de registros
@@ -1288,7 +1294,8 @@ def list_all_credito():
             Creditos.fecha_creacion,
             Creditos.fecha_actualizacion,
             Creditos.ganancia_total,
-            Usuarios.id_usuario
+            Usuarios.id_usuario,
+            Creditos.tipo  # Añadir el campo tipo a la consulta
         ).join(
             Usuarios, Creditos.id_usuario == Usuarios.id_usuario
         ).join(
@@ -1301,13 +1308,20 @@ def list_all_credito():
         
         # Aplicar filtros dinámicos
         if filtro_usuario:
-            query_sql = query_sql.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
+            query_sql = query_sql.filter(
+                or_(
+                    Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"),
+                    Usuarios.cedula.ilike(f"%{filtro_usuario}%"),
+                    Usuarios.celular.ilike(f"%{filtro_usuario}%")
+                )
+            )
         if fecha_inicio and fecha_fin:
             query_sql = query_sql.filter(Creditos.fecha_credito.between(fecha_inicio, fecha_fin))
+        if filtro_tipo:  # Añadir filtro por tipo
+            query_sql = query_sql.filter(Creditos.tipo == filtro_tipo)
     
         # Calcular la suma total del monto de la cuota según el filtro
         suma_monto = query_sql.with_entities(db.func.sum(Creditos.monto_credito)).scalar() or 0
-
 
         # Para obtener el total de usuarios
         total_usuarios = query_sql.count()
@@ -1333,6 +1347,7 @@ def list_all_credito():
             fecha_inicio=fecha_inicio, 
             fecha_fin=fecha_fin,
             filtro_usuario=filtro_usuario,
+            filtro_tipo=filtro_tipo,  # Pasar el filtro de tipo al template
             paginas_visibles=paginas_visibles,
             suma_monto=suma_monto
         ), 200
@@ -1349,6 +1364,7 @@ def list_all_credito():
             usuarios_por_pagina=usuarios_por_pagina,
             fecha_inicio=fecha_inicio, 
             fecha_fin=fecha_fin,
+            filtro_tipo=filtro_tipo,  # Añadir también aquí
             paginas_visibles=[],
             suma_monto=0
         ), 200
@@ -1484,7 +1500,13 @@ def list_all_pagos():
 
         # Aplicar filtros dinámicos
         if filtro_usuario:
-            query = query.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
+            query = query.filter(
+                or_(
+                    Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"),
+                    Usuarios.cedula.ilike(f"%{filtro_usuario}%"),
+                    Usuarios.celular.ilike(f"%{filtro_usuario}%")
+                )
+            )
         if filtro_estado:
             query = query.filter(EstadosDeuda.nombre_estado.ilike(f"%{filtro_estado}%"))
         if fecha_inicio and fecha_fin:

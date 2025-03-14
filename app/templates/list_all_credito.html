@@ -95,17 +95,23 @@
         <form method="GET" action="">
             <div class="filters">
                 <label for="filtro_usuario">Usuario:</label>
-                <input placeholder="Buscar usuario por nombre" type="text" id="filtro_usuario" name="filtro_usuario" value="{{ filtro_usuario }}" class="form-card__input-inline">
+                <input placeholder="Buscar usuario" type="text" id="filtro_usuario" name="filtro_usuario" value="{{ filtro_usuario }}" class="form-card__input-inline">
                 
                 <label for="fecha_inicio">Desde:</label>
                 <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-card__input-inline">
-
+        
                 <label for="fecha_fin">Hasta:</label>
                 <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}" class="form-card__input-inline">
                 
+                <label for="filtro_tipo">Tipo:</label>
+                <select id="filtro_tipo" name="filtro_tipo" class="form-card__input-inline">
+                    <option value="" {% if filtro_tipo == "" %}selected{% endif %}>Todos</option>
+                    <option value="normal" {% if filtro_tipo == "normal" %}selected{% endif %}>Normal</option>
+                    <option value="consular" {% if filtro_tipo == "consular" %}selected{% endif %}>Consular</option>
+                </select>
+                
                 <button type="submit" class="btn btn--green">Filtrar</button>
-                <a href="{{ url_for('download_creditos', fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, filtro_usuario=filtro_usuario) }}" class="btn btn--blue">Descargar Excel</a>
-
+                <a href="{{ url_for('download_creditos', fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, filtro_usuario=filtro_usuario, filtro_tipo=filtro_tipo) }}" class="btn btn--blue">Descargar Excel</a>
             </div>
         </form>
 
@@ -127,6 +133,7 @@
                         <th>Interes</th>
                         <th>Cuotas</th>
                         <th>Modalidad</th>
+                        <th>Tipo</th>  <!-- Nueva columna para el tipo -->
                         <th>Ganancia</th>
                         <th>Fecha Credito</th>
                         <th>Fecha Creación</th>
@@ -145,6 +152,7 @@
                         <td data-label="Interes">{{ '{:,.2f}'.format(user.tasa_interes).replace('.', ',') }}</td>
                         <td data-label="Cuotas">{{ user.numero_cuotas }}</td>
                         <td data-label="Modalidad">{{ user.nombre_modalidad }}</td>
+                        <td data-label="Tipo">{{ user.tipo }}</td>
                         <td data-label="Ganancia">{{ '{:,.0f}'.format(user.ganancia_total) | replace(',', '.') }}</td>
             
                         <td data-label="Fecha Credito">{{ user.fecha_credito if user.fecha_credito else ''}}</td>
@@ -175,13 +183,13 @@
             <!-- Controles de Paginación -->
             <div class="pagination">
                 {% if pagina_actual > 1 %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual - 1 }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">&laquo; Anterior</a>
+                    <a href="?filtro_usuario={{ filtro_usuario }}&pagina={{ pagina_actual - 1 }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&filtro_tipo={{ filtro_tipo }}">&laquo; Anterior</a>
                 {% endif %}
                 {% for pagina in paginas_visibles %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
+                    <a href="?filtro_usuario={{ filtro_usuario }}&pagina={{ pagina }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&filtro_tipo={{ filtro_tipo }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
                 {% endfor %}
                 {% if pagina_actual < total_paginas %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual + 1 }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}">Siguiente &raquo;</a>
+                    <a href="?filtro_usuario={{ filtro_usuario }}&pagina={{ pagina_actual + 1 }}&fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&filtro_tipo={{ filtro_tipo }}">Siguiente &raquo;</a>
                 {% endif %}
             </div>
         </div>
