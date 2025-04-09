@@ -6,6 +6,9 @@ const CHILD_PRICE = 694000;
 const COSTOS_CONSULARES = 832500;
 const ANTICIPO = 385000;
 
+const ADULT_ASESORIA_PRICE = 652000;
+const CHILD_ASESORIA_PRICE = 388000;
+
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -82,8 +85,11 @@ const calculateAmount = () => {
     const totalPeople = adults + children;
 
     if (creditType === 'consular') {
-        // Se suma el costo consular menos el anticipo por persona: 832500 - 385000 = 447500
+        // Crédito consular: se suma el costo consular (832500) por persona
         totalAmount = serviceCost + (totalPeople * 832500);
+    } else if (creditType === 'asesoria') {
+        // Nuevo crédito: 652000 por persona menos 100000 de anticipo = 552000 neto por persona
+        totalAmount = (adults * ADULT_ASESORIA_PRICE) + (children * CHILD_ASESORIA_PRICE);
     } else {
         // Crédito normal: se descuenta 100000 por persona
         totalAmount = serviceCost;
@@ -92,6 +98,8 @@ const calculateAmount = () => {
     document.getElementById('amount').value = formatNumber(totalAmount);
     calculateProfit();
 };
+
+
 
 
 // Función para validar entrada de tasa de interés

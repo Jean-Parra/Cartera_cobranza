@@ -229,6 +229,9 @@ def payment(id):
                 if credito:
                     modalidad = credito.id_modalidad_pago
                     fecha_inicio = fecha_pago_real_date
+                    
+                    # Actualizar la fecha programada de la cuota 1 a la fecha de inicio
+                    pago.fecha_pago_programada = fecha_inicio
 
                     # Actualizar las fechas programadas para las demás cuotas
                     pagos = Pagos.query.filter(
@@ -313,13 +316,19 @@ def register_credito(id):
         service_cost = (adults * 1096000) + (children * 694000)
 
         if credit_type == 'consular':
-            # Para crédito con costos consulares, se suma:
-            # (costos consulares - anticipo) por persona = 447500
+            # Para crédito consular: se suma (costos consulares - anticipo) por persona = 447500
             amount = service_cost + (total_people * 447500)
+        elif credit_type == 'asesoria':
+            # Para el nuevo crédito: precios diferentes para adultos y niños
+            adult_price = 652000 - 100000  # 552000 por adulto (menos anticipo)
+            child_price = 388000 - 100000  # 288000 por niño (menos anticipo)
+
+            amount = (adults * adult_price) + (children * child_price)
         else:
-            # Para crédito normal se descuenta 100000 por persona
+            # Para crédito normal: se descuenta 100000 por persona
             amount = service_cost - (total_people * 100000)
             amount = max(0, amount)  # evitar monto negativo
+
         
         monthly_interest_rate = float(request.form.get("interest_rate").replace(',', '.'))  # Tasa de interés mensual
         installments = int(request.form.get("installments"))  # Número de cuotas
@@ -1081,7 +1090,16 @@ def download_pdf(id):
         }
 
         with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as docx_temp:
-            contrato = Document("CONTRATO_DE_PRESTACION_DE_SERVICIOS_DE_FINANCIAMIENTO.docx")
+            
+            ruta_docx = os.path.join(os.getcwd(), "app", "CONTRATO_DE_PRESTACION_DE_SERVICIOS_DE_FINANCIAMIENTO.docx")
+
+            if os.path.exists(ruta_docx):
+                contrato = Document(ruta_docx)
+                print("Documento cargado correctamente.")
+            else:
+                print("El archivo no existe en la ruta:", ruta_docx)
+
+
 
             def insertar_imagen(parrafo, imagen_path):
                 """
@@ -1133,7 +1151,8 @@ def download_pdf(id):
                         if alineacion is not None:
                             parrafo.alignment = alineacion
                         # Si no hay alineación especial, se mantiene la del párrafo
-                        return insertar_imagen(parrafo, "firma.jpg")
+                        
+                        return insertar_imagen(parrafo, os.path.join(os.getcwd(), "app", "firma.jpg"))
 
                 # Proceder con el reemplazo normal de texto
                 for placeholder, valor in datos.items():
