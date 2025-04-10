@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
-    {% if current_user.id_administrador == 3%}
+    {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/notificaciones.css') }}">
     {% endif %}
 
@@ -25,6 +25,7 @@
                         </div>
                     </a>
                 </li>
+                {% if current_user.id_administrador != 3%}
                 <li class="navigation__item">
                     <a href="/register_user">
                         <div class="navigation__option">
@@ -39,6 +40,7 @@
                         </div>
                     </a>
                 </li>
+                {% endif %}
                 <li class="navigation__item">
                     <a href="/list_all_pagos">
                         <div class="navigation__option">
@@ -53,7 +55,7 @@
                         </div>
                     </a>
                 </li>
-                {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
+                {% if current_user.id_rol == 2 %}
                 <li class="navigation__item">
                     <a href="/register_employee">
                         <div class="navigation__option">
@@ -69,7 +71,7 @@
         </div>
         <div class="navigation-to-right">
             <ul class="navigation__options">
-                {% if current_user.id_administrador == 3%}
+                {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
                 <li id="nav-notifications">
                     <a href="{{ url_for('notifications') }}">
                       Notificaciones <span id="notif-count" class="badge">0</span>
@@ -135,7 +137,7 @@
             <div class="form-card__group">
                 <label class="form-card__label" for="celular">Celular:</label>
                 <input class="form-card__input" type="text" name="celular" id="celular" placeholder="Celular">
-                <p class="form-card__error" id="error-celular">*El celular debe contener exactamente 10 dígitos.</p>
+                <p class="form-card__error" id="error-celular">*El celular debe ser un número válido (opcional '+' seguido de 7 a 15 dígitos).</p>
             </div>
         
             <!-- Correo -->
@@ -174,7 +176,7 @@
         
     </div>
     <!-- Contenedor para los toasts -->
-  {% if current_user.id_administrador == 3%}
+  {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
   <div id="toast-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>

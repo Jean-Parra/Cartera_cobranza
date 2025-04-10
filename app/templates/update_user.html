@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
-    {% if current_user.id_administrador == 3%}
+    {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/notificaciones.css') }}">
     {% endif %}
 
@@ -25,6 +25,7 @@
                         </div>
                     </a>
                 </li>
+                {% if current_user.id_administrador != 3%}
                 <li class="navigation__item">
                     <a href="/register_user">
                         <div class="navigation__option">
@@ -39,6 +40,7 @@
                         </div>
                     </a>
                 </li>
+                {% endif %}
                 <li class="navigation__item">
                     <a href="/list_all_pagos">
                         <div class="navigation__option">
@@ -53,7 +55,7 @@
                         </div>
                     </a>
                 </li>
-                {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
+                {% if current_user.id_rol == 2 %}
                 <li class="navigation__item">
                     <a href="/register_employee">
                         <div class="navigation__option">
@@ -69,7 +71,7 @@
         </div>
         <div class="navigation-to-right">
             <ul class="navigation__options">
-                {% if current_user.id_administrador == 3%}
+                {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
                 <li id="nav-notifications">
                     <a href="{{ url_for('notifications') }}">
                       Notificaciones <span id="notif-count" class="badge">0</span>
@@ -88,6 +90,7 @@
         </div>
     </nav>
     <div class="container">
+          
 
         <h1 class="title">Actualizar usuario</h1>
 
@@ -101,41 +104,89 @@
             <!-- Nombre completo -->
             <div class="form-card__group">
                 <label class="form-card__label" for="nombre_completo">Nombre completo:</label>
-                <input class="form-card__input" type="text" name="nombre_completo" id="nombre_completo" placeholder="Nombre completo" value="{{user.nombre_completo}}">
-                <p class="form-card__error" id="error-nombre_completo">*El nombre debe contener solo letras y espacios (2-50 caracteres).</p>
-            </div>
-        
-            <!-- Cédula -->
-            <div class="form-card__group">
+                <input
+                  class="form-card__input"
+                  type="text"
+                  name="nombre_completo"
+                  id="nombre_completo"
+                  placeholder="Nombre completo"
+                  value="{{ user.nombre_completo }}"
+                  {% if current_user.id_administrador == 3 %}readonly{% endif %}
+                >
+                <p class="form-card__error" id="error-nombre_completo">
+                  *El nombre debe contener solo letras y espacios (2-50 caracteres).
+                </p>
+              </div>
+              
+              <div class="form-card__group">
                 <label class="form-card__label" for="cedula">Cédula:</label>
-                <input class="form-card__input" type="text" name="cedula" id="cedula" placeholder="Cédula" value="{{user.cedula}}">
-                <p class="form-card__error" id="error-cedula">*La cédula debe contener solo números (5-15 dígitos).</p>
-            </div>
-        
-            <!-- Dirección -->
-            <div class="form-card__group">
+                <input
+                  class="form-card__input"
+                  type="text"
+                  name="cedula"
+                  id="cedula"
+                  placeholder="Cédula"
+                  value="{{ user.cedula }}"
+                  {% if current_user.id_administrador == 3 %}readonly{% endif %}
+                >
+                <p class="form-card__error" id="error-cedula">
+                  *La cédula debe contener solo números (5-15 dígitos).
+                </p>
+              </div>
+              
+              <div class="form-card__group">
                 <label class="form-card__label" for="direccion">Dirección:</label>
-                <input class="form-card__input" type="text" name="direccion" id="direccion" placeholder="Dirección" value="{{user.direccion}}">
-                <p class="form-card__error" id="error-direccion">*La dirección debe contener entre 5 y 100 caracteres.</p>
-            </div>
-        
-            <!-- Celular -->
-            <div class="form-card__group">
+                <input
+                  class="form-card__input"
+                  type="text"
+                  name="direccion"
+                  id="direccion"
+                  placeholder="Dirección"
+                  value="{{ user.direccion }}"
+                  {% if current_user.id_administrador == 3 %}readonly{% endif %}
+                >
+                <p class="form-card__error" id="error-direccion">
+                  *La dirección debe contener entre 5 y 100 caracteres.
+                </p>
+              </div>
+              
+              <div class="form-card__group">
                 <label class="form-card__label" for="celular">Celular:</label>
-                <input class="form-card__input" type="text" name="celular" id="celular" placeholder="Celular" value="{{user.celular}}">
-                <p class="form-card__error" id="error-celular">*El celular debe contener exactamente 10 dígitos.</p>
-            </div>
-        
-            <!-- Correo -->
-            <div class="form-card__group">
+                <input
+                  class="form-card__input"
+                  type="text"
+                  name="celular"
+                  id="celular"
+                  placeholder="Celular"
+                  value="{{ user.celular }}"
+                  {% if current_user.id_administrador == 3 %}readonly{% endif %}
+                >
+                <p class="form-card__error" id="error-celular">
+                  *El celular debe contener exactamente 10 dígitos.
+                </p>
+              </div>
+              
+              <div class="form-card__group">
                 <label class="form-card__label" for="correo">Correo:</label>
-                <input class="form-card__input" type="text" name="correo" id="correo" placeholder="Correo" value="{{user.correo}}">
-                <p class="form-card__error" id="error-correo">*El correo debe tener el formato nombre@dominio.com.</p>
-            </div>
+                <input
+                  class="form-card__input"
+                  type="text"
+                  name="correo"
+                  id="correo"
+                  placeholder="Correo"
+                  value="{{ user.correo }}"
+                  {% if current_user.id_administrador == 3 %}readonly{% endif %}
+                >
+                <p class="form-card__error" id="error-correo">
+                  *El correo debe tener el formato nombre@dominio.com.
+                </p>
+              </div>
+              
+              
 
             <div class="form-card__group">
                 <label class="form-card__label" for="file">Archivos:</label>
-                <div id="file-actions" data-user-id="{{ user.id_usuario }}">
+                <div id="file-actions" data-user-id="{{ user.id_usuario }}" data-can-delete="{{ 'false' if current_user.id_administrador == 3 else 'true' }}">
                     <!-- El contenido se llenará dinámicamente -->
                 </div>
             
@@ -147,57 +198,55 @@
                 
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
-                    const userId = document.getElementById('file-actions').getAttribute('data-user-id');
-                    const fileActionsDiv = document.getElementById('file-actions');
-                    const csrfToken = "{{ csrf_token() }}";  // Asumiendo que usas Flask-WTF
+                  const fileActionsDiv = document.getElementById('file-actions');
+                  const userId       = fileActionsDiv.dataset.userId;
+                  const canDelete    = fileActionsDiv.dataset.canDelete === 'true';
+                  const csrfToken    = "{{ csrf_token() }}";
                 
-                    function updateInterface() {
-                        fetch(`/usuario/${userId}/archivos`, { method: 'GET' })
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error('No se pudieron obtener los archivos');
+                  function updateInterface() {
+                    fetch(`/usuario/${userId}/archivos`)
+                      .then(r => r.ok ? r.json() : Promise.reject('Error'))
+                      .then(archivos => {
+                        if (archivos.length) {
+                          let html = '<ul>';
+                          archivos.forEach(archivo => {
+                            html += `
+                              <li>
+                                <a href="/usuario/${userId}/archivo/${archivo}"
+                                   class="btn btn-download">${archivo}</a>
+                                ${canDelete
+                                  ? `<button onclick="deleteFile('${archivo}')"
+                                              class="btn btn-delete">Eliminar</button>`
+                                  : ''
                                 }
-                                return response.json();
-                            })
-                            .then(archivos => {
-                                if (Array.isArray(archivos) && archivos.length > 0) {
-                                    let html = '<ul>';
-                                    archivos.forEach(archivo => {
-                                        html += `<li>
-                                                    <a href="/usuario/${userId}/archivo/${archivo}" class="btn btn-download">
-                                                        ${archivo}
-                                                    </a>
-                                                    <button onclick="deleteFile('${archivo}')" class="btn btn-delete">Eliminar</button>
-                                                </li>`;
-                                    });
-                                    html += '</ul>';
-                                    fileActionsDiv.innerHTML = html;
-                                } else {
-                                    fileActionsDiv.innerHTML = `<p>No hay archivos subidos.</p>`;
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error al verificar archivos:', error);
-                                fileActionsDiv.innerHTML = `<p>Error al cargar archivos.</p>`;
-                            });
-                    }
+                              </li>
+                            `;
+                          });
+                          html += '</ul>';
+                          fileActionsDiv.innerHTML = html;
+                        } else {
+                          fileActionsDiv.innerHTML = '<p>No hay archivos subidos.</p>';
+                        }
+                      })
+                      .catch(() => {
+                        fileActionsDiv.innerHTML = '<p>Error al cargar archivos.</p>';
+                      });
+                  }
                 
-                    window.deleteFile = function(filename) {
-                        fetch(`/usuario/${userId}/archivo/${filename}`, {
-                            method: 'DELETE',
-                            headers: {
-                                "X-CSRFToken": csrfToken
-                            }
-                        })
-                        .then(response => response.json())
-                        .then(result => {
-                            alert(result.message);
-                            updateInterface();
-                        })
-                        .catch(error => console.error('Error al eliminar archivo:', error));
-                    };
+                  window.deleteFile = function(filename) {
+                    fetch(`/usuario/${userId}/archivo/${filename}`, {
+                      method: 'DELETE',
+                      headers: { "X-CSRFToken": csrfToken }
+                    })
+                    .then(r => r.json())
+                    .then(res => {
+                      alert(res.message);
+                      updateInterface();
+                    })
+                    .catch(console.error);
+                  };
                 
-                    updateInterface();
+                  updateInterface();
                 });
                 </script>
                  
@@ -226,7 +275,7 @@
         
     </div>
     <!-- Contenedor para los toasts -->
-  {% if current_user.id_administrador == 3%}
+  {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
   <div id="toast-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>

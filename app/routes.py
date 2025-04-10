@@ -178,6 +178,9 @@ def reset_with_token(token):
 @check_db_connection
 @login_required
 def payment(id):
+    
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     pago = Pagos.query.filter_by(id_pago=id).first()
     
     if not pago:
@@ -292,7 +295,9 @@ def payment(id):
 @app.route("/register_credito/<int:id>", methods=["GET", "POST"])
 @check_db_connection
 @login_required
-def register_credito(id):    
+def register_credito(id):
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     mostrar_exito = False
     # Obtener el nombre completo del usuario usando el id
     usuario = Usuarios.query.filter_by(id_usuario=id).first()
@@ -437,9 +442,8 @@ def register_credito(id):
             
             # Si el crédito es de tipo consular, enviar notificación al admin (ID 1)
             if credit_type == 'consular':
-                print("hola")
                 message = f"Nuevo crédito consular registrado para {nombre_completo}."
-                target_user_id = 1  # Siempre se envía al administrador con ID 1
+                target_user_id = 3  # Siempre se envía al administrador con ID 1
                 send_notification(target_user_id, message, credit_id=nuevo_credito.id_credito)
             else:
                 print("chao")
@@ -461,6 +465,8 @@ def register_credito(id):
 @check_db_connection
 @login_required
 def update_credito(id):
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     mostrar_exito = False
     mostrar_alerta = False
     credito = Creditos.query.filter_by(id_credito=id).first()
@@ -629,6 +635,8 @@ def update_credito(id):
 @check_db_connection
 @login_required
 def register_user():
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     mostrar_alerta = False
     mostrar_exito = False
     mostrar_alerta2 = False
@@ -708,9 +716,8 @@ def register_user():
 @check_db_connection
 @login_required
 def register_employee():
-    
-    if current_user.id_rol == 1:
-        return "No tienes permiso para ver los empleados", 403
+    if current_user.id_administrador !=2:
+        return "No tienes permiso", 403
         
         
     mostrar_alerta = False
@@ -823,6 +830,8 @@ def list_users():
 @check_db_connection
 @login_required
 def send_multiple_emails():
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     try:
         # Eliminamos la lectura duplicada de request.get_json()
         data = request.get_json()
@@ -904,6 +913,8 @@ def send_multiple_emails():
 @check_db_connection
 @login_required
 def list_mora():
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     pagina_actual = request.args.get("pagina", default=1, type=int)
     usuarios_por_pagina = 10
 
@@ -1042,6 +1053,8 @@ def list_pagos(id):
 
 @app.route('/download-pdf/<int:id>', methods=['POST'])
 def download_pdf(id):
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     
     try:
         credito = Creditos.query.get_or_404(id)
@@ -1777,6 +1790,12 @@ def update_user(id):
                     filepath = os.path.join('pdfs', unique_filename)
                     file.save(filepath)
                     mostrar_exito = True
+                    
+                    if current_user.id_administrador == 3:
+                        message = f"Pago de credito registrado con exito - {usuario_actual.nombre_completo}"
+                        target_user_id = 1  # Siempre se envía al administrador con ID 1
+                        send_notification(target_user_id, message)
+                    
 
             
 
@@ -1793,6 +1812,8 @@ def update_user(id):
 @check_db_connection
 @login_required
 def deshabilitar_usuario(id):
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     if request.method == "PUT":
         try:
             usuario = Usuarios.query.get(id)
@@ -1825,6 +1846,8 @@ def deshabilitar_usuario(id):
 @check_db_connection
 @login_required
 def deshabilitar_credito(id):
+    if current_user.id_administrador != 1 and current_user.id_administrador !=2:
+        return "No tienes permiso", 403
     if request.method == "PUT":
         try:
             credito = Creditos.query.get(id)
@@ -1934,6 +1957,7 @@ def allowed_file(filename):
 
 @app.route('/pago/<int:id_pago>/archivo', methods=['GET', 'POST'])
 def gestionar_pago(id_pago):
+    
     # Ruta completa del archivo
     filepath = os.path.join(UPLOAD_FOLDER_PAGOS, f"{id_pago}.jpg")
 
@@ -1968,7 +1992,6 @@ def gestionar_pago(id_pago):
         
 # Función para enviar notificaciones
 def send_notification(target_user_id, message, credit_id=None):
-    print("aaaaaa")
     if str(target_user_id) in current_active_users:
         socketio.emit('notification', {'message': message, 'credit_id': credit_id}, room=str(target_user_id))
         
@@ -1985,12 +2008,11 @@ def send_notification(target_user_id, message, credit_id=None):
 @app.route("/notificaciones")
 @login_required
 def notifications():
-    # Número de página actual (por defecto 1)
     pagina_actual = request.args.get("pagina", default=1, type=int)
     notificaciones_por_pagina = 10
 
-    # Consulta: se filtran las notificaciones del usuario actual y se ordenan de la más reciente a la más antigua
-    query = Notification.query.filter_by(user_id=1)\
+    # Consulta de notificaciones del usuario administrador actual
+    query = Notification.query.filter_by(user_id=current_user.id_administrador)\
                 .order_by(Notification.fecha_creacion.desc())
     
     total_notificaciones = query.count()
@@ -1998,14 +2020,23 @@ def notifications():
     inicio = (pagina_actual - 1) * notificaciones_por_pagina
     notificaciones_paginadas = query.offset(inicio).limit(notificaciones_por_pagina).all()
 
-    # Marcar todas las notificaciones pendientes como "leído" (o cambiar su estado)
-    pendientes = Notification.query.filter_by(user_id=1, status='pendiente').all()
+    # Cargar las relaciones necesarias para obtener el id_usuario
+    for notif in notificaciones_paginadas:
+        if notif.credit_id:
+            credito = Creditos.query.get(notif.credit_id)
+            if credito:
+                notif.usuario_id = credito.id_usuario
+            else:
+                notif.usuario_id = None
+        else:
+            notif.usuario_id = None
+
+    # Marcar como leídas
+    pendientes = Notification.query.filter_by(user_id=current_user.id_administrador, status='pendiente').all()
     for notif in pendientes:
         notif.status = 'leido'
     db.session.commit()
 
-
-    # Definir un rango de páginas visibles
     paginas_visibles = [
         pagina for pagina in range(
             max(1, pagina_actual - 2),
@@ -2018,6 +2049,7 @@ def notifications():
                            pagina_actual=pagina_actual,
                            paginas_visibles=paginas_visibles,
                            total_paginas=total_paginas), 200
+
 
 
 
@@ -2038,8 +2070,9 @@ def handle_disconnect():
 @app.route("/api/notificaciones_pendientes")
 @login_required
 def api_notificaciones_pendientes():
+        
     pending_count = Notification.query.filter_by(
-        user_id=1,
+        user_id=current_user.id_administrador,
         status='pendiente'
     ).count()
     return jsonify({'pending_count': pending_count})

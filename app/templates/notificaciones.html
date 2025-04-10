@@ -3,81 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <title>Mi Aplicación</title>
-  {% if current_user.id_administrador == 3%}
+  {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/notificaciones.css') }}">
     {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/navigation.css') }}" />
 </head>
 <body>
   <nav class="navigation container">
-    <div class="navigation-to-left">
-        <ul class="navigation__options">
-            <li class="navigation__item">
-                <a href="/list_users">
-                    <div class="navigation__option">
-                        <p>Lista de usuarios</p>
-                    </div>
-                </a>
-            </li>
-            <li class="navigation__item">
-                <a href="/register_user">
-                    <div class="navigation__option">
-                        <p>Registrar usuario</p>
-                    </div>
-                </a>
-            </li>
-            <li class="navigation__item">
-                <a href="/list_mora">
-                    <div class="navigation__option">
-                        <p>Correos de pagos</p>
-                    </div>
-                </a>
-            </li>
-            <li class="navigation__item">
-                <a href="/list_all_pagos">
-                    <div class="navigation__option">
-                        <p>Filtro de pagos</p>
-                    </div>
-                </a>
-            </li>
-            <li class="navigation__item">
-                <a href="/list_all_credito">
-                    <div class="navigation__option">
-                        <p>Filtro de creditos</p>
-                    </div>
-                </a>
-            </li>
-            {% if current_user.id_rol == 2 or current_user.id_rol == 3 %}
-            <li class="navigation__item">
-                <a href="/register_employee">
-                    <div class="navigation__option">
-                        <p>Registrar  empleados</p>
-                    </div>
-                </a>
-            </li>
-            {% endif %}
-        </ul>
-    </div>
-    <div class="navigation-to-right">
-        <ul class="navigation__options">
-            {% if current_user.id_administrador == 3%}
-            <li id="nav-notifications">
-                <a href="{{ url_for('notifications') }}">
-                  Notificaciones <span id="notif-count" class="badge">0</span>
-                </a>
-              </li>
-            {% endif %}
-            <li class="navigation__item">
-                <a href="/logout">
-                    <div class="navigation__option">
-                        <p>Cerrar sesion</p>
-                    </div>
-                </a>
-            </li>
-        </ul>
+        <div class="navigation-to-left">
+            <ul class="navigation__options">
+                <li class="navigation__item">
+                    <a href="/list_users">
+                        <div class="navigation__option">
+                            <p>Lista de usuarios</p>
+                        </div>
+                    </a>
+                </li>
+                {% if current_user.id_administrador != 3%}
+                <li class="navigation__item">
+                    <a href="/register_user">
+                        <div class="navigation__option">
+                            <p>Registrar usuario</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_mora">
+                        <div class="navigation__option">
+                            <p>Correos de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="navigation__item">
+                    <a href="/list_all_pagos">
+                        <div class="navigation__option">
+                            <p>Filtro de pagos</p>
+                        </div>
+                    </a>
+                </li>
+                <li class="navigation__item">
+                    <a href="/list_all_credito">
+                        <div class="navigation__option">
+                            <p>Filtro de creditos</p>
+                        </div>
+                    </a>
+                </li>
+                {% if current_user.id_rol == 2 %}
+                <li class="navigation__item">
+                    <a href="/register_employee">
+                        <div class="navigation__option">
+                            <p>Registrar  empleados</p>
+                        </div>
+                    </a>
+                </li>
+                {% endif %}
+                
 
-    </div>
-</nav>
+    
+            </ul>
+        </div>
+        <div class="navigation-to-right">
+            <ul class="navigation__options">
+                {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
+                <li id="nav-notifications">
+                    <a href="{{ url_for('notifications') }}">
+                      Notificaciones <span id="notif-count" class="badge">0</span>
+                    </a>
+                  </li>
+                {% endif %}
+                <li class="navigation__item">
+                    <a href="/logout">
+                        <div class="navigation__option">
+                            <p>Cerrar sesion</p>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+        </div>
+    </nav>
 
   <h2>Notificaciones</h2>
   <ul class="notification-list">
@@ -87,15 +92,25 @@
           <span class="notification-message">{{ noti.message }}</span>
           <small class="notification-date">{{ noti.fecha_creacion }}</small>
         </div>
-        {% if noti.credit_id %}
-          <a href="{{ url_for('list_pagos', id=noti.credit_id) }}" class="notification-link">Ver pagos</a>
-          
+        {% if noti.credit_id and noti.usuario_id %}
+        <a href="{{ url_for('update_user', id=noti.usuario_id) }}" class="notification-link">
+            {% if current_user.id_administrador == 1 %}
+            Ver pago
+            {% elif current_user.id_administrador == 3 %}
+            Añadir pago
+            {% else %}
+            Ver/Añadir pago
+            {% endif %}
+        </a>
         {% endif %}
+
       </li>
     {% else %}
       <li class="notification-item">No hay notificaciones pendientes.</li>
     {% endfor %}
-</ul>
+  </ul>
+  
+  
 
 <!-- Controles de Paginación -->
 <div class="pagination">
@@ -112,7 +127,7 @@
 
 
   <!-- Contenedor para los toasts -->
-  {% if current_user.id_administrador == 3%}
+  {% if current_user.id_administrador == 1 or current_user.id_administrador == 3 %}
   <div id="toast-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
