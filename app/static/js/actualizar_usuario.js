@@ -3,7 +3,7 @@ const regEx = {
     'nombre_completo': /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,50}$/, // Letras y espacios, de 2 a 50 caracteres
     'cedula': /^\d{5,15}$/, // Solo números, entre 5 y 15 dígitos
     'direccion': /^.{5,100}$/, // Cualquier carácter, de 5 a 100 caracteres
-    'celular': /^\d{10}$/, // Solo números, exactamente 10 dígitos
+    'celular': /^\+?[0-9\s\-]{7,20}$/,
     'correo': /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/ // Formato de correo
 };
 

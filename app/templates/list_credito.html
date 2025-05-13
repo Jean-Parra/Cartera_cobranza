@@ -101,13 +101,13 @@
                     <th>ID</th>
                     <th>Usuario</th>
                     <th>Credito</th>
-                    <th>Interes</th>
                     <th>Cuotas</th>
                     <th>Modalidad</th>
-                    <th>Ganancia</th>
+                    <th>Cuotas pagadas</th>
+                    <th>Pago consular</th>
+                    <th>Número personas</th>   
                     <th>Fecha Credito</th>
                     <th>Fecha Creación</th>
-                    <th>Fecha Actualización</th>
                     {% if current_user.id_administrador != 3%}
                     <th>Contrato</th>
                     <th>Editar</th>
@@ -124,14 +124,24 @@
                     <td data-label="ID">{{ user.id_credito }}</td>
                     <td data-label="Usuario">{{ user.nombre_completo }}</td>
                     <td data-label="Credito">{{ '{:,.0f}'.format(user.monto_credito) | replace(',', '.') }}</td>
-                    <td data-label="Interes">{{ '{:,.2f}'.format(user.tasa_interes).replace('.', ',') }}</td>
                     <td data-label="Cuotas">{{ user.numero_cuotas }}</td>
                     <td data-label="Modalidad">{{ user.nombre_modalidad }}</td>
-                    <td data-label="Ganancia">{{ '{:,.0f}'.format(user.ganancia_total) | replace(',', '.') }}</td>
-        
+                    <td data-label="Cuotas pagadas">{{ user.cuotas_pagadas }}</td> <!-- Nuevo campo -->
+                    <td data-label="Pago consular">
+                        {% if user.tipo != 'consular' %}
+                          N/A
+                        {% else %}
+                          {% if user.tiene_docs_id3 %}
+                            <span class="badge bg-success" style="background-color: #28a745 !important; color: white;">✓</span>
+                          {% else %}
+                            <span class="badge bg-danger" style="background-color: #dc3545 !important; color: white;">✗</span>
+                          {% endif %}
+                        {% endif %}
+                    </td>
+                      
+                    <td data-label="Numero Personas">{{ user.numero_personas if user.numero_personas else ''}}</td>
                     <td data-label="Fecha Credito">{{ user.fecha_credito if user.fecha_credito else ''}}</td>
                     <td data-label="Fecha Creación">{{ user.fecha_creacion if user.fecha_creacion else ''}}</td>
-                    <td data-label="Fecha Actualización">{{ user.fecha_actualizacion if user.fecha_actualizacion else ''}}</td>
 
                     {% if current_user.id_administrador != 3%}
                     

@@ -162,7 +162,7 @@
                   {% if current_user.id_administrador == 3 %}readonly{% endif %}
                 >
                 <p class="form-card__error" id="error-celular">
-                  *El celular debe contener exactamente 10 dígitos.
+                    *El celular debe ser un número válido (opcional '+' seguido de 7 a 15 dígitos).
                 </p>
               </div>
               
@@ -184,80 +184,117 @@
               
               
 
-            <div class="form-card__group">
+              <div class="form-card__group">
                 <label class="form-card__label" for="file">Archivos:</label>
-                <div id="file-actions" data-user-id="{{ user.id_usuario }}" data-can-delete="{{ 'false' if current_user.id_administrador == 3 else 'true' }}">
-                    <!-- El contenido se llenará dinámicamente -->
+              
+                <div id="file-actions"
+                     data-user-id="{{ user.id_usuario }}"
+                     data-can-delete="{{ 'false' if current_user.id_administrador == 3 else 'true' }}">
+                  <!-- Lista de archivos ya subidos se llena dinámicamente -->
                 </div>
-            
+              
                 <div id="upload-section">
-                    <input class="form-card__input" type="file" name="file" id="file" multiple>
-
+                  <input class="form-card__input" type="file" name="file" id="file" multiple>
+                  <ul id="selected-files-list"></ul>
                 </div>
-            </div>
-                
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                  const fileActionsDiv = document.getElementById('file-actions');
-                  const userId       = fileActionsDiv.dataset.userId;
-                  const canDelete    = fileActionsDiv.dataset.canDelete === 'true';
-                  const csrfToken    = "{{ csrf_token() }}";
-                
-                  function updateInterface() {
-                    fetch(`/usuario/${userId}/archivos`)
-                      .then(r => r.ok ? r.json() : Promise.reject('Error'))
-                      .then(archivos => {
-                        if (archivos.length) {
-                          let html = '<ul>';
-                          archivos.forEach(archivo => {
-                            html += `
-                              <li>
-                                <a href="/usuario/${userId}/archivo/${archivo}"
-                                   class="btn btn-download">${archivo}</a>
+              </div>
+              
+              <script>
+              document.addEventListener('DOMContentLoaded', function () {
+                const fileActionsDiv = document.getElementById('file-actions');
+                const userId = fileActionsDiv.dataset.userId;
+                const canDelete = fileActionsDiv.dataset.canDelete === 'true';
+                const csrfToken = "{{ csrf_token() }}";
+                const fileInput = document.getElementById('file');
+                const selectedFilesList = document.getElementById('selected-files-list');
+                const form = document.querySelector('form');
+              
+                // Mostrar campos de fecha al seleccionar archivos nuevos
+                fileInput.addEventListener('change', function () {
+                  selectedFilesList.innerHTML = '';
+                  Array.from(fileInput.files).forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                      ${file.name}
+                      <input type="date" name="upload_date_${index}" class="form-card__input" required style="margin-left: 10px;">
+                    `;
+                    selectedFilesList.appendChild(li);
+                  });
+                });
+              
+                // Validar que todas las fechas estén llenas si hay archivos nuevos
+                form.addEventListener('submit', function (e) {
+                  const fileCount = fileInput.files.length;
+                  const allDateInputs = selectedFilesList.querySelectorAll('input[type="date"]');
+              
+                  if (fileCount > 0) {
+                    const allFilled = Array.from(allDateInputs).every(input => input.value);
+                    if (!allFilled) {
+                      e.preventDefault();
+                      alert("Por favor, selecciona una fecha para cada archivo nuevo.");
+                    }
+                  }
+                });
+              
+                // Cargar archivos ya existentes con su fecha
+                function updateInterface() {
+                  fetch(`/usuario/${userId}/archivos`)
+                    .then(r => r.ok ? r.json() : Promise.reject('Error'))
+                    .then(archivos => {
+                      if (archivos.length) {
+                        let html = '<ul>';
+                        archivos.forEach(archivo => {
+                          html += `
+                            <li style="margin-bottom: 15px; list-style: none; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+                              <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <a href="/usuario/${userId}/archivo/${archivo.filename}" class="btn btn-download">${archivo.filename}</a>
                                 ${canDelete
-                                  ? `<button onclick="deleteFile('${archivo}')"
-                                              class="btn btn-delete">Eliminar</button>`
+                                  ? `<button onclick="deleteFile('${archivo.filename}')" class="btn btn-delete">Eliminar</button>`
                                   : ''
                                 }
-                              </li>
-                            `;
-                          });
-                          html += '</ul>';
-                          fileActionsDiv.innerHTML = html;
-                        } else {
-                          fileActionsDiv.innerHTML = '<p>No hay archivos subidos.</p>';
-                        }
-                      })
-                      .catch(() => {
-                        fileActionsDiv.innerHTML = '<p>Error al cargar archivos.</p>';
-                      });
-                  }
-                
-                  window.deleteFile = function(filename) {
-                    fetch(`/usuario/${userId}/archivo/${filename}`, {
-                      method: 'DELETE',
-                      headers: { "X-CSRFToken": csrfToken }
+                              </div>
+                              <div style="margin-top: 5px; padding-left: 10px; font-size: 0.9em;">
+                                <div><strong>Fecha seleccionada:</strong> ${archivo.upload_date || 'No disponible'}</div>
+                                <div><strong>Fecha creación:</strong> ${archivo.creation_date || 'No disponible'}</div>
+                                <div><strong>Responsable:</strong> ${archivo.uploader_email || 'No disponible'}</div>
+                              </div>
+                            </li>
+                          `;
+                        });
+                        html += '</ul>';
+                        fileActionsDiv.innerHTML = html;
+
+                      } else {
+                        fileActionsDiv.innerHTML = '<p>No hay archivos subidos.</p>';
+                      }
                     })
-                    .then(r => r.json())
-                    .then(res => {
-                      alert(res.message);
-                      updateInterface();
-                    })
-                    .catch(console.error);
-                  };
-                
-                  updateInterface();
-                });
-                </script>
-                 
-            
-            
-            
-        
-            <div class="cl"></div>
-            <div class="form-card__buttons">
+                    .catch(() => {
+                      fileActionsDiv.innerHTML = '<p>Error al cargar archivos.</p>';
+                    });
+                }
+              
+                window.deleteFile = function (filename) {
+                  fetch(`/usuario/${userId}/archivo/${filename}`, {
+                    method: 'DELETE',
+                    headers: { "X-CSRFToken": csrfToken }
+                  })
+                  .then(r => r.json())
+                  .then(res => {
+                    alert(res.message);
+                    updateInterface();
+                  })
+                  .catch(console.error);
+                };
+              
+                updateInterface();
+              });
+              </script>
+              
+              <div class="cl"></div>
+              <div class="form-card__buttons">
                 <button class="btn btn--green btn--block" type="submit">Actualizar usuario</button>
-            </div>
+              </div>
+              
         
             <!-- Mensajes generales -->
             <div id="alerta" class="form-card__error {% if mostrar_alerta %}visible{% else %}invisible{% endif %}">

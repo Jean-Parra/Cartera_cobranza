@@ -3,14 +3,14 @@ from dateutil.relativedelta import relativedelta
 import io
 import os
 from docx import Document
-from flask import Response, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Response, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user,login_required, login_user, logout_user
 import numpy_financial as npf
 import xlsxwriter
 from app import app, db, s, socketio, current_active_users
 from app.metodos import send_email_amazon
-from app.models import Administradores, Auditoria, Creditos, EstadosDeuda, ModalidadesPago, Notification, Pagos, Usuarios
-from sqlalchemy import text
+from app.models import Administradores, Archivos, Auditoria, Creditos, EstadosDeuda, ModalidadesPago, Notification, Pagos, Usuarios
+from sqlalchemy import and_, case, exists, func, text
 from functools import wraps
 from werkzeug.utils import secure_filename
 from sqlalchemy import or_
@@ -24,6 +24,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from PIL import Image
 import subprocess
 import time
+from sqlalchemy.orm import joinedload
 
 # Ruta base del directorio actual
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,6 +36,8 @@ UPLOAD_FOLDER_PAGOS = os.path.join(BASE_DIR, '..', 'images')
 # Asegurarse de que la carpeta exista
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_PAGOS, exist_ok=True)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 
@@ -329,6 +332,11 @@ def register_credito(id):
             child_price = 388000 - 100000  # 288000 por niño (menos anticipo)
 
             amount = (adults * adult_price) + (children * child_price)
+        elif credit_type == 'asesoria+consular':
+            # Nuevo tipo: mismo precio para adultos y niños, con anticipo restado
+            price_after_anticipo = 1432900 - 100000  # 1332900 por persona
+
+            amount = total_people * price_after_anticipo
         else:
             # Para crédito normal: se descuenta 100000 por persona
             amount = service_cost - (total_people * 100000)
@@ -443,7 +451,7 @@ def register_credito(id):
             # Si el crédito es de tipo consular, enviar notificación al admin (ID 1)
             if credit_type == 'consular':
                 message = f"Nuevo crédito consular registrado para {nombre_completo}."
-                target_user_id = 3  # Siempre se envía al administrador con ID 1
+                target_user_id = 3  # Siempre se envía al administrador con ID 3
                 send_notification(target_user_id, message, credit_id=nuevo_credito.id_credito)
             else:
                 print("chao")
@@ -1237,7 +1245,7 @@ def list_credito(id):
     usuarios_por_pagina = 10
 
     try:
-        # Consulta para obtener el número total de registros
+        # 1) Consulta base con todos los campos necesarios
         query_sql = db.session.query(
             Creditos.id_credito,
             Usuarios.nombre_completo,
@@ -1248,35 +1256,111 @@ def list_credito(id):
             Creditos.fecha_credito,
             Creditos.fecha_creacion,
             Creditos.fecha_actualizacion,
-            Creditos.ganancia_total,
-            Usuarios.id_usuario
+            Creditos.tipo,  # Añadimos el tipo para poder calcular numero_personas
+            # Conteo de cuotas pagadas
+            func.count(
+                case(
+                    (Pagos.id_estado_deuda == 2, 1),
+                    else_=None
+                )
+            ).label('cuotas_pagadas'),
+            # Flag de existencia de docs subidos por admin=3
+            exists().where(
+                and_(
+                    Archivos.id_usuario == Usuarios.id_usuario,
+                    Archivos.id_subidor == 3
+                )
+            ).label('tiene_docs_id3')
         ).join(
             Usuarios, Creditos.id_usuario == Usuarios.id_usuario
         ).join(
             ModalidadesPago, Creditos.id_modalidad_pago == ModalidadesPago.id_modalidad
+        ).outerjoin(
+            Pagos,
+            (Creditos.id_credito == Pagos.id_credito) & (Pagos.habilitado == True)
         ).filter(
             Usuarios.id_usuario == id,
-            Creditos.habilitado == True  # Filtro para incluir solo los créditos habilitados
+            Creditos.habilitado == True
+        ).group_by(
+            Creditos.id_credito,
+            Usuarios.nombre_completo,
+            Creditos.monto_credito,
+            Creditos.tasa_interes,
+            Creditos.numero_cuotas,
+            ModalidadesPago.nombre_modalidad,
+            Creditos.fecha_credito,
+            Creditos.fecha_creacion,
+            Creditos.fecha_actualizacion,
+            Creditos.tipo,
+            Usuarios.id_usuario,
         ).order_by(
-            Creditos.id_credito.asc()  # Ordenar por id_credito de menor a mayor
+            Creditos.id_credito.asc()
         )
 
-
-
-        # Para obtener el total de usuarios
+        # 2) Paginación
         total_usuarios = query_sql.count()
-
-        # Cálculo de paginación
         total_paginas = (total_usuarios - 1) // usuarios_por_pagina + 1
         inicio = (pagina_actual - 1) * usuarios_por_pagina
 
-        # Consulta con paginación
-        users_paginados = query_sql.offset(inicio).limit(usuarios_por_pagina).all()
+        users_raw = query_sql.offset(inicio).limit(usuarios_por_pagina).all()
+        
+        # 3) Convertir a diccionarios y añadir numero_personas
+        users_paginados = []
+        for user in users_raw:
+            # Convertir a diccionario para poder modificar
+            user_dict = user._asdict() if hasattr(user, '_asdict') else {
+                col: getattr(user, col) for col in user._fields
+            } if hasattr(user, '_fields') else dict(user._mapping)
+            
+            # Calcular numero_personas basado en tipo y monto_credito
+            if user.tipo == 'normal':
+                precio_adulto = 1096000  - 100000
+                precio_nino = 694000  - 100000  
+                precio_promedio = (precio_adulto + precio_nino) / 2 
+                
+                user_dict['numero_personas'] = round(user.monto_credito / precio_promedio)
+                
+            elif user.tipo == 'consular':
+                # Para consular, asumimos precio promedio entre adulto y niño
+                precio_adulto = 1928500 - 385000  # 1,543,500
+                precio_nino = 1526500 - 385000    # 1,141,500
+                precio_promedio = (precio_adulto + precio_nino) / 2  # 1,342,500
+                
+                # Si el monto es exactamente divisible por alguno de los precios, usamos ese
+                if user.monto_credito % precio_adulto == 0:
+                    user_dict['numero_personas'] = user.monto_credito // precio_adulto
+                elif user.monto_credito % precio_nino == 0:
+                    user_dict['numero_personas'] = user.monto_credito // precio_nino
+                else:
+                    # Si no es exacto, usamos el precio promedio para estimar
+                    user_dict['numero_personas'] = round(user.monto_credito / precio_promedio)
+                
+            elif user.tipo == 'asesoria':
+                # Precios actualizados para asesoría
+                precio_adulto = 652000 - 100000  # 552,000
+                precio_nino = 388000 - 100000    # 288,000
+                precio_promedio = (precio_adulto + precio_nino) / 2  # 420,000
+                
+                # Estimamos usando precio promedio
+                user_dict['numero_personas'] = round(user.monto_credito / precio_promedio)
+                
+            elif user.tipo == 'asesoria+consular':
+                # Precio actualizado para asesoria+consular
+                precio_persona = 1432900 - 100000  # 1,332,900
+                user_dict['numero_personas'] = round(user.monto_credito / precio_persona)
+                
+            else:
+                # Para otros tipos de crédito
+                user_dict['numero_personas'] = None
+                
+            users_paginados.append(user_dict)
 
-        paginas_visibles = []
-        for pagina in range(max(1, pagina_actual - 2), min(total_paginas + 1, pagina_actual + 3)):
-            paginas_visibles.append(pagina)
+        # 4) Construcción de páginas visibles
+        paginas_visibles = [
+            p for p in range(max(1, pagina_actual - 2), min(total_paginas + 1, pagina_actual + 3))
+        ]
 
+        # 5) Renderizado
         return render_template(
             "list_credito.html",
             data=users_paginados,
@@ -1288,8 +1372,7 @@ def list_credito(id):
         ), 200
 
     except Exception as e:
-        print("Error al obtener los usuarios:", e)
-        # En caso de error, mostrar una página en blanco o una página de error
+        app.logger.error("Error al obtener los créditos: %s", e)
         return render_template(
             "list_credito.html",
             data=[],
@@ -1307,14 +1390,13 @@ def list_credito(id):
 def list_all_credito():
     pagina_actual = request.args.get("pagina", default=1, type=int)
     usuarios_por_pagina = 10
-    
-    filtro_usuario = request.args.get("filtro_usuario", "").strip()
-    fecha_inicio = request.args.get("fecha_inicio", "").strip()
-    fecha_fin = request.args.get("fecha_fin", "").strip()
-    filtro_tipo = request.args.get("filtro_tipo", "").strip()  # Nuevo parámetro para filtrar por tipo
+
+    filtro_usuario = request.args.get("filtro_usuario", default="", type=str)
+    filtro_tipo = request.args.get("filtro_tipo", default="", type=str)
+    fecha_inicio = request.args.get("fecha_inicio", default="", type=str)
+    fecha_fin = request.args.get("fecha_fin", default="", type=str)
 
     try:
-        # Consulta para obtener el número total de registros
         query_sql = db.session.query(
             Creditos.id_credito,
             Usuarios.nombre_completo,
@@ -1325,49 +1407,114 @@ def list_all_credito():
             Creditos.fecha_credito,
             Creditos.fecha_creacion,
             Creditos.fecha_actualizacion,
-            Creditos.ganancia_total,
-            Usuarios.id_usuario,
-            Creditos.tipo  # Añadir el campo tipo a la consulta
+            Creditos.tipo,
+            func.count(
+                case((Pagos.id_estado_deuda == 2, 1), else_=None)
+            ).label('cuotas_pagadas'),
+            exists().where(
+                and_(
+                    Archivos.id_usuario == Usuarios.id_usuario,
+                    Archivos.id_subidor == 3
+                )
+            ).label('tiene_docs_id3')
         ).join(
             Usuarios, Creditos.id_usuario == Usuarios.id_usuario
         ).join(
             ModalidadesPago, Creditos.id_modalidad_pago == ModalidadesPago.id_modalidad
-        ).filter(
-            Creditos.habilitado == True  # Filtro para incluir solo los créditos habilitados
-        ).order_by(
-            Creditos.id_credito.asc()  # Ordenar por id_credito de menor a mayor
-        )
-        
-        # Aplicar filtros dinámicos
-        if filtro_usuario:
-            query_sql = query_sql.filter(
-                or_(
-                    Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"),
-                    Usuarios.cedula.ilike(f"%{filtro_usuario}%"),
-                    Usuarios.celular.ilike(f"%{filtro_usuario}%")
-                )
+        ).outerjoin(
+            Pagos, and_(
+                Creditos.id_credito == Pagos.id_credito,
+                Pagos.habilitado == True
             )
-        if fecha_inicio and fecha_fin:
-            query_sql = query_sql.filter(Creditos.fecha_credito.between(fecha_inicio, fecha_fin))
-        if filtro_tipo:  # Añadir filtro por tipo
+        ).filter(
+            Creditos.habilitado == True
+        )
+
+        if filtro_usuario:
+            query_sql = query_sql.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
+        if filtro_tipo:
             query_sql = query_sql.filter(Creditos.tipo == filtro_tipo)
-    
-        # Calcular la suma total del monto de la cuota según el filtro
-        suma_monto = query_sql.with_entities(db.func.sum(Creditos.monto_credito)).scalar() or 0
+        if fecha_inicio:
+            query_sql = query_sql.filter(Creditos.fecha_credito >= fecha_inicio)
+        if fecha_fin:
+            query_sql = query_sql.filter(Creditos.fecha_credito <= fecha_fin)
 
-        # Para obtener el total de usuarios
+        query_sql = query_sql.group_by(
+            Creditos.id_credito,
+            Usuarios.nombre_completo,
+            Creditos.monto_credito,
+            Creditos.tasa_interes,
+            Creditos.numero_cuotas,
+            ModalidadesPago.nombre_modalidad,
+            Creditos.fecha_credito,
+            Creditos.fecha_creacion,
+            Creditos.fecha_actualizacion,
+            Creditos.tipo,
+            Usuarios.id_usuario
+        ).order_by(Creditos.id_credito.asc())
+
         total_usuarios = query_sql.count()
-
-        # Cálculo de paginación
         total_paginas = (total_usuarios - 1) // usuarios_por_pagina + 1
         inicio = (pagina_actual - 1) * usuarios_por_pagina
 
-        # Consulta con paginación
-        users_paginados = query_sql.offset(inicio).limit(usuarios_por_pagina).all()
+        users_raw = query_sql.offset(inicio).limit(usuarios_por_pagina).all()
 
-        paginas_visibles = []
-        for pagina in range(max(1, pagina_actual - 2), min(total_paginas + 1, pagina_actual + 3)):
-            paginas_visibles.append(pagina)
+        users_paginados = []
+        for user in users_raw:
+            user_dict = user._asdict() if hasattr(user, '_asdict') else dict(user._mapping)
+
+            tipo = user_dict["tipo"]
+            monto = user_dict["monto_credito"]
+
+            if tipo == 'normal':
+                precio_adulto = 1096000 - 100000
+                precio_nino = 694000 - 100000
+                promedio = (precio_adulto + precio_nino) / 2
+                user_dict["numero_personas"] = round(monto / promedio)
+            elif tipo == 'consular':
+                precio_adulto = 1928500 - 385000
+                precio_nino = 1526500 - 385000
+                promedio = (precio_adulto + precio_nino) / 2
+                if monto % precio_adulto == 0:
+                    user_dict["numero_personas"] = monto // precio_adulto
+                elif monto % precio_nino == 0:
+                    user_dict["numero_personas"] = monto // precio_nino
+                else:
+                    user_dict["numero_personas"] = round(monto / promedio)
+            elif tipo == 'asesoria':
+                precio_adulto = 652000 - 100000
+                precio_nino = 388000 - 100000
+                promedio = (precio_adulto + precio_nino) / 2
+                user_dict["numero_personas"] = round(monto / promedio)
+            elif tipo == 'asesoria+consular':
+                precio = 1432900 - 100000
+                user_dict["numero_personas"] = round(monto / precio)
+            else:
+                user_dict["numero_personas"] = None
+
+            users_paginados.append(user_dict)
+
+        # Calcular suma del monto total sin paginación
+        query_suma = db.session.query(func.sum(Creditos.monto_credito)).join(
+            Usuarios, Creditos.id_usuario == Usuarios.id_usuario
+        ).filter(
+            Creditos.habilitado == True
+        )
+
+        if filtro_usuario:
+            query_suma = query_suma.filter(Usuarios.nombre_completo.ilike(f"%{filtro_usuario}%"))
+        if filtro_tipo:
+            query_suma = query_suma.filter(Creditos.tipo == filtro_tipo)
+        if fecha_inicio:
+            query_suma = query_suma.filter(Creditos.fecha_credito >= fecha_inicio)
+        if fecha_fin:
+            query_suma = query_suma.filter(Creditos.fecha_credito <= fecha_fin)
+
+        suma_monto = query_suma.scalar() or 0
+
+        paginas_visibles = [
+            p for p in range(max(1, pagina_actual - 2), min(total_paginas + 1, pagina_actual + 3))
+        ]
 
         return render_template(
             "list_all_credito.html",
@@ -1376,17 +1523,16 @@ def list_all_credito():
             total_usuarios=total_usuarios,
             total_paginas=total_paginas,
             usuarios_por_pagina=usuarios_por_pagina,
-            fecha_inicio=fecha_inicio, 
+            fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             filtro_usuario=filtro_usuario,
-            filtro_tipo=filtro_tipo,  # Pasar el filtro de tipo al template
+            filtro_tipo=filtro_tipo,
             paginas_visibles=paginas_visibles,
             suma_monto=suma_monto
         ), 200
 
     except Exception as e:
-        print("Error al obtener los usuarios:", e)
-        # En caso de error, mostrar una página en blanco o una página de error
+        app.logger.error("Error al obtener todos los créditos: %s", e)
         return render_template(
             "list_all_credito.html",
             data=[],
@@ -1394,12 +1540,15 @@ def list_all_credito():
             total_usuarios=0,
             total_paginas=0,
             usuarios_por_pagina=usuarios_por_pagina,
-            fecha_inicio=fecha_inicio, 
+            fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            filtro_tipo=filtro_tipo,  # Añadir también aquí
+            filtro_usuario=filtro_usuario,
+            filtro_tipo=filtro_tipo,
             paginas_visibles=[],
             suma_monto=0
         ), 200
+
+
 
 @app.route('/download_creditos', methods=['GET'])
 @check_db_connection
@@ -1775,30 +1924,61 @@ def update_user(id):
             except Exception:
                 db.session.rollback()
                 mostrar_alerta = True
+        
+        # ----- Procesar subida de archivos -----
+        files = request.files.getlist('file')
+
+        if files:
+            try:
+                for i, file in enumerate(files):
+                    if file and file.filename:
+                        # Obtener la fecha correspondiente a este archivo
+                        upload_date_str = request.form.get(f'upload_date_{i}')
+                        if not upload_date_str:
+                            raise ValueError(f"Falta la fecha de subida para el archivo {file.filename}")
+                        
+                        fecha_subida = datetime.strptime(upload_date_str, '%Y-%m-%d').date()
+
+                        nombre_seguro = secure_filename(file.filename)
+                        unique_name = f"{id}_{nombre_seguro}"
+                        ruta = os.path.join('pdfs', unique_name)
+                        file.save(ruta)
+
+                        # Crear registro en BD
+                        nuevo = Archivos(
+                            id_usuario=id,
+                            nombre_archivo=unique_name,
+                            id_subidor=current_user.id_administrador,
+                            correo_subidor=current_user.correo,
+                            fecha_subida=fecha_subida
+                        )
+                        db.session.add(nuevo)
+
+                db.session.commit()
+                mostrar_exito = True
+                
+                
+
+                if current_user.id_administrador == 3:
+                    # Aquí buscamos el crédito más reciente de este usuario
+                    ultimo_credito = (
+                        Creditos.query
+                        .filter_by(id_usuario=id)
+                        .order_by(Creditos.fecha_credito.desc())
+                        .first()
+                    )
+                    message = f"Pago de crédito registrado con éxito - {usuario_actual.nombre_completo}"
+                    target_user_id = 1
+                    send_notification(target_user_id, message, credit_id=ultimo_credito.id_credito)
+
+            except Exception as e:
+                db.session.rollback()
+                print("Error al subir archivos:", e)
+                mostrar_alerta = True
+
         else:
-            mostrar_exito = False  # No hubo cambios, por lo que no se muestra éxito
+            mostrar_alerta = True
             
-        # Procesar subida de múltiples archivos (por ejemplo, PDFs)
-        if 'file' in request.files:
-            files = request.files.getlist('file')
-            for file in files:
-                if file.filename != '':
-                    # Asegurarse de que el nombre del archivo sea seguro
-                    filename = secure_filename(file.filename)
-                    # Generar un nombre único para cada archivo, ej: id_originalFilename.pdf
-                    unique_filename = f"{id}_{filename}"
-                    filepath = os.path.join('pdfs', unique_filename)
-                    file.save(filepath)
-                    mostrar_exito = True
-                    
-                    if current_user.id_administrador == 3:
-                        message = f"Pago de credito registrado con exito - {usuario_actual.nombre_completo}"
-                        target_user_id = 1  # Siempre se envía al administrador con ID 1
-                        send_notification(target_user_id, message)
-                    
-
-            
-
         return render_template('update_user.html', user=usuario_actual, mostrar_exito=mostrar_exito, mostrar_alerta=mostrar_alerta)
     
     elif request.method == "GET":
@@ -1910,44 +2090,76 @@ def subir_archivos(id_usuario):
 
 
 @app.route('/usuario/<int:id_usuario>/archivos', methods=['GET'])
+@login_required
 def listar_archivos(id_usuario):
     try:
-        archivos = [
-            filename for filename in os.listdir(UPLOAD_FOLDER)
-            if (filename.startswith(f"{id_usuario}_") or filename.startswith(f"{id_usuario}."))
-        ]
+        archivos_bd = Archivos.query.filter_by(id_usuario=id_usuario) \
+                                   .order_by(Archivos.fecha_subida.desc()).all()
+                                   
+        resultado = []
+
+            
+        for f in archivos_bd:
+            resultado.append({
+                'filename': f.nombre_archivo,
+                'uploader_email': f.correo_subidor,
+                'upload_date': f.fecha_subida.strftime('%d/%m/%Y'),
+                'creation_date': f.fecha_creacion.strftime('%d/%m/%Y %H:%M:%S'),
+                'download_url': url_for('descargar_archivo',
+                                        id_usuario=id_usuario,
+                                        filename=f.nombre_archivo,
+                                        _external=False)
+            })
+            print(resultado)
+        return jsonify(resultado), 200
     except Exception as e:
         return jsonify({'message': 'Error al listar archivos', 'error': str(e)}), 500
 
-    # Devuelve un array vacío en lugar de un 404 si no hay archivos
-    return jsonify(archivos), 200
 
 
 @app.route('/usuario/<int:id_usuario>/archivo/<filename>', methods=['GET'])
+@login_required
 def descargar_archivo(id_usuario, filename):
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    if os.path.exists(filepath):
-        return send_file(filepath, as_attachment=True, download_name=filename)
+    # Validar metadata en BD
+    archivo = Archivos.query.filter_by(
+        id_usuario=id_usuario,
+        nombre_archivo=filename
+    ).first()
+    if not archivo:
+        return jsonify({'message': 'Archivo no encontrado o sin permiso'}), 404
+
+    carpeta = app.config['UPLOAD_FOLDER']
+    if os.path.exists(os.path.join(carpeta, filename)):
+        return send_from_directory(carpeta, filename, as_attachment=True, download_name=filename)
     else:
-        return jsonify({'message': 'Archivo no encontrado'}), 404
+        return jsonify({'message': 'El archivo no existe en el servidor'}), 500
+
 
 
 @app.route('/usuario/<int:id_usuario>/archivo/<string:filename>', methods=['DELETE'])
 @login_required
 def eliminar_archivo(id_usuario, filename):
-    # Verificar que el archivo pertenezca al usuario mediante la convención de nombres (id_usuario_filename)
     if not filename.startswith(f"{id_usuario}_"):
         return jsonify({'message': 'No autorizado para eliminar este archivo.'}), 403
 
     filepath = os.path.join(UPLOAD_FOLDER, filename)
+
     if os.path.exists(filepath):
         try:
             os.remove(filepath)
+
+            # Eliminar el registro en la base de datos
+            archivo = Archivos.query.filter_by(id_usuario=id_usuario, nombre_archivo=filename).first()
+            if archivo:
+                db.session.delete(archivo)
+                db.session.commit()
+
             return jsonify({'message': 'Archivo eliminado correctamente'}), 200
         except Exception as e:
             return jsonify({'message': 'Error al eliminar el archivo', 'error': str(e)}), 500
     else:
         return jsonify({'message': 'Archivo no encontrado'}), 404
+
 
 
 
@@ -2010,46 +2222,79 @@ def send_notification(target_user_id, message, credit_id=None):
 def notifications():
     pagina_actual = request.args.get("pagina", default=1, type=int)
     notificaciones_por_pagina = 10
+    admin_id = current_user.id_administrador
 
-    # Consulta de notificaciones del usuario administrador actual
-    query = Notification.query.filter_by(user_id=current_user.id_administrador)\
-                .order_by(Notification.fecha_creacion.desc())
-    
-    total_notificaciones = query.count()
-    total_paginas = (total_notificaciones - 1) // notificaciones_por_pagina + 1
+    # 1) Trae TODAS las notificaciones de este admin, ordenadas de más recientes a más viejas
+    todas = (
+        Notification.query
+        .filter_by(user_id=admin_id)
+        .order_by(Notification.fecha_creacion.desc())
+        .all()
+    )
+
+    # 2) Construye un dict para quedarte sólo la PRIMERA notificación de cada credit_id
+    unique_per_credit = {}
+    for notif in todas:
+        cid = notif.credit_id
+        # clave única: credit_id o el propio id de notif si no tiene crédito
+        key = cid if cid is not None else f"none_{notif.id_notificaciones}"
+        if key not in unique_per_credit:
+            unique_per_credit[key] = notif
+
+    filtradas = list(unique_per_credit.values())
+    # 3) Si es admin=3, quitamos aquí los créditos que ya tienen archivos subidos por el admin 3
+    if admin_id == 3:
+        filtradas = [
+            notif for notif in filtradas
+            if not (
+                notif.credit_id and
+                # buscamos si para ese crédito existe un archivo subido por admin=3
+                db.session.query(Archivos)
+                  .join(Creditos, Creditos.id_usuario == Archivos.id_usuario)
+                  .filter(
+                      Creditos.id_credito == notif.credit_id,
+                      Archivos.id_subidor == 3
+                  )
+                  .first()
+            )
+        ]
+
+    # 4) Ordenamos de nuevo por fecha
+    filtradas.sort(key=lambda n: n.fecha_creacion, reverse=True)
+
+    # 5) Paginación “manual”
+    total_notifs = len(filtradas)
+    total_paginas = (total_notifs - 1) // notificaciones_por_pagina + 1
     inicio = (pagina_actual - 1) * notificaciones_por_pagina
-    notificaciones_paginadas = query.offset(inicio).limit(notificaciones_por_pagina).all()
+    fin = inicio + notificaciones_por_pagina
+    notifs_paginadas = filtradas[inicio:fin]
 
-    # Cargar las relaciones necesarias para obtener el id_usuario
-    for notif in notificaciones_paginadas:
+    # 6) Para cada notif con credit_id, carga usuario_id
+    for notif in notifs_paginadas:
         if notif.credit_id:
             credito = Creditos.query.get(notif.credit_id)
-            if credito:
-                notif.usuario_id = credito.id_usuario
-            else:
-                notif.usuario_id = None
+            notif.usuario_id = credito.id_usuario if credito else None
         else:
             notif.usuario_id = None
 
-    # Marcar como leídas
-    pendientes = Notification.query.filter_by(user_id=current_user.id_administrador, status='pendiente').all()
-    for notif in pendientes:
-        notif.status = 'leido'
+    # 7) Marca todas las pendientes como leídas
+    Notification.query.filter_by(
+        user_id=admin_id, status='pendiente'
+    ).update({'status': 'leido'})
     db.session.commit()
 
-    paginas_visibles = [
-        pagina for pagina in range(
-            max(1, pagina_actual - 2),
-            min(total_paginas + 1, pagina_actual + 3)
-        )
-    ]
-
-    return render_template("notificaciones.html",
-                           notifications=notificaciones_paginadas,
-                           pagina_actual=pagina_actual,
-                           paginas_visibles=paginas_visibles,
-                           total_paginas=total_paginas), 200
-
+    # 8) Renderizado
+    paginas_visibles = list(range(
+        max(1, pagina_actual - 2),
+        min(total_paginas + 1, pagina_actual + 3)
+    ))
+    return render_template(
+        "notificaciones.html",
+        notifications=notifs_paginadas,
+        pagina_actual=pagina_actual,
+        paginas_visibles=paginas_visibles,
+        total_paginas=total_paginas
+    ), 200
 
 
 
@@ -2076,3 +2321,52 @@ def api_notificaciones_pendientes():
         status='pendiente'
     ).count()
     return jsonify({'pending_count': pending_count})
+
+
+def migrar_archivos():
+    archivos = os.listdir(UPLOAD_FOLDER)
+    total = 0
+
+    for archivo in archivos:
+        try:
+            if '_' not in archivo:
+                continue  # no sigue la convención de nombres
+
+            partes = archivo.split('_', 1)
+            id_usuario = int(partes[0])
+            nombre_seguro = secure_filename(archivo)
+            ruta_archivo = os.path.join(UPLOAD_FOLDER, archivo)
+
+            # Fecha de creación del archivo en el sistema
+            timestamp_creacion = os.path.getctime(ruta_archivo)
+            fecha_creacion = datetime.fromtimestamp(timestamp_creacion)
+
+            # Verifica si ya existe en la base de datos
+            ya_existe = Archivos.query.filter_by(nombre_archivo=archivo).first()
+            if ya_existe:
+                continue  # evita duplicados
+
+            nuevo = Archivos(
+                id_usuario=id_usuario,
+                nombre_archivo=archivo,
+                fecha_creacion=fecha_creacion,
+                fecha_subida=fecha_creacion,  # puedes cambiarlo si tienes mejor dato
+                id_subidor=1,
+                correo_subidor="Fernando@reagendar.com"
+            )
+            db.session.add(nuevo)
+            total += 1
+
+        except Exception as e:
+            print(f"Error procesando {archivo}: {e}")
+
+    db.session.commit()
+    print(f"{total} archivos migrados exitosamente.")
+    
+@app.route('/migrar-archivos')
+@login_required
+def migrar_archivos_view():
+    if current_user.id_administrador != 2:
+        return "Acceso denegado", 403
+    migrar_archivos()
+    return "Archivos migrados correctamente"

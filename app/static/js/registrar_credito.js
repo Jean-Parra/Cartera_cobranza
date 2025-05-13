@@ -9,6 +9,7 @@ const ANTICIPO = 385000;
 const ADULT_ASESORIA_PRICE = 652000;
 const CHILD_ASESORIA_PRICE = 388000;
 
+const ASESORIO_CONSULAR = 1432900;
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -90,6 +91,8 @@ const calculateAmount = () => {
     } else if (creditType === 'asesoria') {
         // Nuevo crédito: 652000 por persona menos 100000 de anticipo = 552000 neto por persona
         totalAmount = (adults * ADULT_ASESORIA_PRICE) + (children * CHILD_ASESORIA_PRICE);
+    } else if (creditType === 'asesoria+consular') {
+        totalAmount = totalPeople * ASESORIO_CONSULAR;
     } else {
         // Crédito normal: se descuenta 100000 por persona
         totalAmount = serviceCost;

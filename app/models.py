@@ -10,6 +10,34 @@ from sqlalchemy import JSON, func
 def load_user(user_id):
     return Administradores.query.get(int(user_id))
 
+class Archivos(db.Model):
+    __tablename__ = 'Archivos'
+    id_archivo = db.Column(db.Integer, primary_key=True)
+    id_usuario = db.Column(
+        db.Integer,
+        db.ForeignKey('Usuarios.id_usuario'),
+        nullable=False
+    )
+    nombre_archivo = db.Column(db.String(256), nullable=False)
+    id_subidor = db.Column(
+        db.Integer,
+        db.ForeignKey('Administradores.id_administrador'),
+        nullable=False
+    )
+    correo_subidor = db.Column(db.String(120), nullable=False)
+    fecha_subida = db.Column(db.Date, nullable=False)
+    fecha_creacion = db.Column(
+        db.DateTime,
+        nullable=True,
+        default=db.func.current_timestamp()
+    )
+    # Relaciones
+    usuario = db.relationship('Usuarios', back_populates='archivos')
+    subidor = db.relationship('Administradores', back_populates='archivos_subidos')
+
+    def __repr__(self):
+        return f'<Archivo {self.nombre_archivo} para Usuario {self.id_usuario} subido por Admin {self.id_subidor}>'
+
 
 class Administradores(db.Model):
     __tablename__ = 'Administradores'
@@ -23,12 +51,14 @@ class Administradores(db.Model):
         nullable=False
     )
 
-    # Relación con Roles
+    # Relaciones
     rol = db.relationship('Roles', back_populates='administradores')
-
-    # Relación con Auditoria
-    auditorias = db.relationship('Auditoria', back_populates='administrador')  # Relación inversa
-
+    auditorias = db.relationship('Auditoria', back_populates='administrador')
+    archivos_subidos = db.relationship(
+        'Archivos', 
+        back_populates='subidor', 
+        cascade='all, delete-orphan'
+    )
     def set_password(self, password):
         self.contraseña = generate_password_hash(password)
 
@@ -219,6 +249,53 @@ class Creditos(db.Model):
     )
     
     pagos = db.relationship('Pagos', back_populates='credito')
+    
+    @property
+    def numero_personas(self):
+        """
+        Calcula el número de personas basado en el monto del crédito y el tipo.
+        Nota: Para 'asesoria' no es posible determinar exactamente el número de adultos vs niños,
+        por lo que se asume que todos son adultos para simplificar.
+        """
+        if self.tipo == 'normal':
+            precio_adulto = 1096000 - 100000  # 1,543,500
+            precio_nino = 694000  - 100000    # 1,141,500
+            precio_promedio = (precio_adulto + precio_nino) / 2  # 1,342,500
+            
+            return round(self.monto_credito / precio_promedio)
+            
+        elif self.tipo == 'consular':
+            # Precios actualizados para consular
+            precio_adulto = 1928500 - 385000  # 1,543,500
+            precio_nino = 1526500 - 385000    # 1,141,500
+            precio_promedio = (precio_adulto + precio_nino) / 2  # 1,342,500
+            
+            # Si el monto es exactamente divisible por alguno de los precios, usamos ese
+            if self.monto_credito % precio_adulto == 0:
+                return self.monto_credito // precio_adulto
+            elif self.monto_credito % precio_nino == 0:
+                return self.monto_credito // precio_nino
+            else:
+                # Si no es exacto, usamos el precio promedio para estimar
+                return round(self.monto_credito / precio_promedio)
+            
+        elif self.tipo == 'asesoria':
+            # Precios actualizados para asesoría
+            precio_adulto = 652000 - 100000  # 552,000
+            precio_nino = 388000 - 100000    # 288,000
+            precio_promedio = (precio_adulto + precio_nino) / 2  # 420,000
+            
+            # Estimamos usando precio promedio
+            return round(self.monto_credito / precio_promedio)
+            
+        elif self.tipo == 'asesoria+consular':
+            # Precio actualizado para asesoria+consular
+            precio_persona = 1432900 - 100000  # 1,332,900
+            return round(self.monto_credito / precio_persona)
+            
+        else:
+            # Para otros tipos de crédito
+            return None
 
     def __repr__(self):
         return f'<Creditos {self.id_credito}>'
@@ -270,6 +347,12 @@ class Usuarios(db.Model):
 
     # Relationship with Creditos
     creditos = db.relationship('Creditos', back_populates='usuario')
+    
+    archivos = db.relationship(
+        'Archivos', 
+        back_populates='usuario', 
+        cascade='all, delete-orphan'
+    )
 
     def __repr__(self):
         return f'<Usuarios {self.id_usuario}>'
