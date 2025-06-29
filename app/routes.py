@@ -41,6 +41,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 
+@app.before_request
+def redirect_ip_to_https():
+    if request.host.startswith("3.88.129.139"):
+        return redirect(request.url.replace("http://3.88.129.139:5000", "https://reagendarcartera.com"), code=301)
+
 
 def convert_to_pdf(docx_path, output_dir):
     try:
