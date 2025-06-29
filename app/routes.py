@@ -1742,6 +1742,72 @@ def list_all_pagos():
 
         ), 200
 
+@app.route('/download_usuarios', methods=['GET'])
+@check_db_connection
+@login_required
+def download_usuarios():
+    try:
+        # Obtener todos los usuarios
+        usuarios = Usuarios.query.all()
+
+        # Crear archivo Excel en memoria
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet("Usuarios")
+
+        # Formato para cabecera y fechas
+        header_format = workbook.add_format({'bold': True, 'align': 'center', 'border': 1})
+        datetime_format = workbook.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss'})
+
+        # Encabezados
+        headers = [
+            'ID', 'Nombre completo', 'Cédula', 'Dirección', 'Celular', 'Correo',
+            'Expedición', 'Residencia', 'Habilitado', 'Fecha creación', 'Fecha actualización'
+        ]
+
+        for col_num, header in enumerate(headers):
+            worksheet.write(0, col_num, header, header_format)
+
+        # Escribir datos
+        for row_num, usuario in enumerate(usuarios, start=1):
+            row = [
+                usuario.id_usuario,
+                usuario.nombre_completo,
+                usuario.cedula,
+                usuario.direccion,
+                usuario.celular,
+                usuario.correo,
+                usuario.expedicion,
+                usuario.residencia,
+                'Sí' if usuario.habilitado else 'No',
+                usuario.fecha_creacion,
+                usuario.fecha_actualizacion
+            ]
+            for col_num, cell_data in enumerate(row):
+                if isinstance(cell_data, datetime):
+                    worksheet.write_datetime(row_num, col_num, cell_data, datetime_format)
+                elif cell_data is None:
+                    worksheet.write(row_num, col_num, '')
+                else:
+                    worksheet.write(row_num, col_num, cell_data)
+
+        # Ajustar anchos de columna
+        for col_num in range(len(headers)):
+            worksheet.set_column(col_num, col_num, 20)
+
+        workbook.close()
+        output.seek(0)
+
+        return Response(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={"Content-Disposition": "attachment;filename=usuarios.xlsx"}
+        )
+
+    except Exception as e:
+        print("Error al generar el archivo Excel de usuarios:", e)
+        return "Error al generar el archivo Excel de usuarios", 500
+
 @app.route('/download_pagos', methods=['GET'])
 @check_db_connection
 @login_required
