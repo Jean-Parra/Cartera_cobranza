@@ -11,3 +11,5 @@ pip install num2words
 pip install Pillow
 pip install --upgrade XlsxWriter
 pip install flask-socketio eventlet
+pip install numpy-financial
+sudo apt install libreoffice

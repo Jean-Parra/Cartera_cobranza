@@ -10,10 +10,9 @@ import xlsxwriter
 from app import app, db, s, socketio, current_active_users
 from app.metodos import send_email_amazon
 from app.models import Administradores, Archivos, Auditoria, Creditos, EstadosDeuda, ModalidadesPago, Notification, Pagos, Usuarios
-from sqlalchemy import and_, case, exists, func, text
+from sqlalchemy import and_,or_, case, exists, func, text, extract
 from functools import wraps
 from werkzeug.utils import secure_filename
-from sqlalchemy import or_
 
 import tempfile
 from num2words import num2words
@@ -777,23 +776,22 @@ def logout():
     return redirect(url_for("login"))
 
 
-
 @app.route("/list_users", methods=["GET"])
 @check_db_connection
 @login_required
 def list_users():
     filtro = request.args.get("filtro", "")
+    mes_filtro = request.args.get("mes_filtro", "")
+    anio_filtro = request.args.get("anio_filtro", "")
     pagina_actual = request.args.get("pagina", default=1, type=int)
     usuarios_por_pagina = 10
 
     try:
-        
+        # Query base - solo usuarios habilitados
         query = Usuarios.query.filter_by(habilitado=1)
         
-        
+        # Filtro por texto (nombre, cedula, celular)
         if filtro:
-            
-
             query = query.filter(
                 or_(
                     Usuarios.nombre_completo.ilike(f"%{filtro}%"),
@@ -801,11 +799,34 @@ def list_users():
                     Usuarios.celular.ilike(f"%{filtro}%")
                 )
             )
-            
-        total_usuarios = query.count()  # Contar el total de usuarios después del filtro
-        total_paginas = (total_usuarios - 1) // usuarios_por_pagina + 1  # Calcular el número total de páginas
-        inicio = (pagina_actual - 1) * usuarios_por_pagina  # Calcular el índice de inicio para la página actual
-        users_paginados = query.offset(inicio).limit(usuarios_por_pagina).all()  # Obtener los usuarios para la página actual
+        
+        # Filtro por mes
+        if mes_filtro:
+            query = query.filter(extract('month', Usuarios.fecha_creacion) == int(mes_filtro))
+        
+        # Filtro por año
+        if anio_filtro:
+            query = query.filter(extract('year', Usuarios.fecha_creacion) == int(anio_filtro))
+        
+        # Obtener años disponibles para el dropdown
+        anios_disponibles = db.session.query(
+            extract('year', Usuarios.fecha_creacion).label('anio')
+        ).filter(
+            Usuarios.habilitado == 1,
+            Usuarios.fecha_creacion.isnot(None)
+        ).distinct().order_by(
+            extract('year', Usuarios.fecha_creacion).desc()
+        ).all()
+        
+        anios_disponibles = [anio.anio for anio in anios_disponibles if anio.anio]
+        
+        # Paginación
+        total_usuarios = query.count()
+        total_paginas = (total_usuarios - 1) // usuarios_por_pagina + 1 if total_usuarios > 0 else 1
+        inicio = (pagina_actual - 1) * usuarios_por_pagina
+        users_paginados = query.offset(inicio).limit(usuarios_por_pagina).all()
+        
+        # Páginas visibles para la paginación
         paginas_visibles = []
         for pagina in range(
             max(1, pagina_actual - 2), min(total_paginas + 1, pagina_actual + 3)
@@ -820,6 +841,9 @@ def list_users():
             total_paginas=total_paginas,
             usuarios_por_pagina=usuarios_por_pagina,
             filtro=filtro,
+            mes_filtro=mes_filtro,
+            anio_filtro=anio_filtro,
+            anios_disponibles=anios_disponibles,
             paginas_visibles=paginas_visibles,
         ), 200
 
@@ -834,9 +858,11 @@ def list_users():
             total_paginas=0,
             usuarios_por_pagina=usuarios_por_pagina,
             filtro=filtro,
+            mes_filtro="",
+            anio_filtro="",
+            anios_disponibles=[],
             paginas_visibles=[],
         ), 200
-    
     
 # Ruta Flask corregida
 @app.route('/send_multiple_emails', methods=['POST'])

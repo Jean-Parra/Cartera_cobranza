@@ -126,6 +126,31 @@
                 <label for="filtro">Usuario:</label>
                 <input placeholder="Buscar usuario" type="text" id="filtro" name="filtro" value="{{ filtro }}" class="form-card__input-inline">
                 
+                <label for="mes_filtro">Mes de registro:</label>
+                <select id="mes_filtro" name="mes_filtro" class="form-card__input-inline">
+                    <option value="">Todos los meses</option>
+                    <option value="1" {% if mes_filtro == '1' %}selected{% endif %}>Enero</option>
+                    <option value="2" {% if mes_filtro == '2' %}selected{% endif %}>Febrero</option>
+                    <option value="3" {% if mes_filtro == '3' %}selected{% endif %}>Marzo</option>
+                    <option value="4" {% if mes_filtro == '4' %}selected{% endif %}>Abril</option>
+                    <option value="5" {% if mes_filtro == '5' %}selected{% endif %}>Mayo</option>
+                    <option value="6" {% if mes_filtro == '6' %}selected{% endif %}>Junio</option>
+                    <option value="7" {% if mes_filtro == '7' %}selected{% endif %}>Julio</option>
+                    <option value="8" {% if mes_filtro == '8' %}selected{% endif %}>Agosto</option>
+                    <option value="9" {% if mes_filtro == '9' %}selected{% endif %}>Septiembre</option>
+                    <option value="10" {% if mes_filtro == '10' %}selected{% endif %}>Octubre</option>
+                    <option value="11" {% if mes_filtro == '11' %}selected{% endif %}>Noviembre</option>
+                    <option value="12" {% if mes_filtro == '12' %}selected{% endif %}>Diciembre</option>
+                </select>
+
+                <label for="anio_filtro">Año:</label>
+                <select id="anio_filtro" name="anio_filtro" class="form-card__input-inline">
+                    <option value="">Todos los años</option>
+                    {% for anio in anios_disponibles %}
+                        <option value="{{ anio }}" {% if anio_filtro == anio|string %}selected{% endif %}>{{ anio }}</option>
+                    {% endfor %}
+                </select>
+                
                 <button type="submit" class="btn btn--green">Filtrar</button>
                 <a href="{{ url_for('download_usuarios') }}" class="btn btn--blue">Descargar Excel</a>
             </div>
@@ -144,6 +169,7 @@
                         <th>Dirección</th>
                         <th>Celular</th>
                         <th>Correo</th>
+                        <th>Fecha Registro</th>
                         {% if current_user.id_administrador != 3%}
                         <th>Nuevo Credito</th>
                         {% endif %}
@@ -168,6 +194,7 @@
                         <td data-label="Direccion">{{ user.direccion }}</td>
                         <td data-label="Celular">{{ user.celular }}</td>
                         <td data-label="Correo">{{ user.correo }}</td>
+                        <td data-label="Fecha Registro">{{ user.fecha_creacion.strftime('%d/%m/%Y') if user.fecha_creacion else 'N/A' }}</td>
                         {% if current_user.id_administrador != 3%}
                         <td data-label="Nuevo credito" data-id="{{ user.id_usuario }}">
                             <a href="{{ url_for('register_credito', id=user.id_usuario) }}">
@@ -212,13 +239,13 @@
             <!-- Controles de Paginación -->
             <div class="pagination">
                 {% if pagina_actual > 1 %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual - 1 }}">&laquo; Anterior</a>
+                    <a href="?filtro={{ filtro }}&mes_filtro={{ mes_filtro }}&anio_filtro={{ anio_filtro }}&pagina={{ pagina_actual - 1 }}">&laquo; Anterior</a>
                 {% endif %}
                 {% for pagina in paginas_visibles %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
+                    <a href="?filtro={{ filtro }}&mes_filtro={{ mes_filtro }}&anio_filtro={{ anio_filtro }}&pagina={{ pagina }}" class="{% if pagina == pagina_actual %}active{% endif %}">{{ pagina }}</a>
                 {% endfor %}
                 {% if pagina_actual < total_paginas %}
-                    <a href="?filtro={{ filtro }}&pagina={{ pagina_actual + 1 }}">Siguiente &raquo;</a>
+                    <a href="?filtro={{ filtro }}&mes_filtro={{ mes_filtro }}&anio_filtro={{ anio_filtro }}&pagina={{ pagina_actual + 1 }}">Siguiente &raquo;</a>
                 {% endif %}
             </div>
 
