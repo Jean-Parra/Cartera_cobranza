@@ -23,7 +23,7 @@ db = SQLAlchemy(app)
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 # Configuración de Socket.IO
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 # Variable global para almacenar los usuarios activos (IDs en formato string)
 current_active_users = set()
