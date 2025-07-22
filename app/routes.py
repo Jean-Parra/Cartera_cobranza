@@ -1345,41 +1345,138 @@ def list_credito(id):
             
             # Calcular numero_personas basado en tipo y monto_credito
             if user.tipo == 'normal':
-                precio_adulto = 1096000  - 100000
-                precio_nino = 694000  - 100000  
-                precio_promedio = (precio_adulto + precio_nino) / 2 
+                precio_adulto = 1096000 - 100000  # 996,000
+                precio_nino = 694000 - 100000     # 594,000
                 
-                user_dict['numero_personas'] = round(user.monto_credito / precio_promedio)
+                # Intentar encontrar la combinación exacta de adultos y niños
+                encontrado = False
                 
+                # Probar diferentes combinaciones (hasta 5 personas total)
+                for num_adultos in range(6):
+                    for num_ninos in range(6 - num_adultos):
+                        if num_adultos + num_ninos > 0:  # Al menos una persona
+                            total_calculado = (num_adultos * precio_adulto) + (num_ninos * precio_nino)
+                            if total_calculado == user.monto_credito:
+                                user_dict['numero_personas'] = num_adultos + num_ninos
+                                encontrado = True
+                                break
+                    if encontrado:
+                        break
+                
+                # Si no encontramos combinación exacta, aproximar
+                if not encontrado:
+                    # Primero intentar solo adultos
+                    if user.monto_credito % precio_adulto == 0:
+                        user_dict['numero_personas'] = user.monto_credito // precio_adulto
+                    # Luego intentar solo niños
+                    elif user.monto_credito % precio_nino == 0:
+                        user_dict['numero_personas'] = user.monto_credito // precio_nino
+                    else:
+                        # Si no es divisible, buscar la mejor aproximación
+                        mejor_diferencia = float('inf')
+                        mejor_personas = 1
+                        
+                        for num_personas in range(1, 6):  # Máximo 5 personas
+                            # Probar todas las combinaciones para este número de personas
+                            for num_adultos in range(num_personas + 1):
+                                num_ninos = num_personas - num_adultos
+                                total = (num_adultos * precio_adulto) + (num_ninos * precio_nino)
+                                diferencia = abs(total - user.monto_credito)
+                                
+                                if diferencia < mejor_diferencia:
+                                    mejor_diferencia = diferencia
+                                    mejor_personas = num_personas
+                        
+                        user_dict['numero_personas'] = mejor_personas
+
             elif user.tipo == 'consular':
-                # Para consular, asumimos precio promedio entre adulto y niño
                 precio_adulto = 1928500 - 385000  # 1,543,500
                 precio_nino = 1526500 - 385000    # 1,141,500
-                precio_promedio = (precio_adulto + precio_nino) / 2  # 1,342,500
                 
-                # Si el monto es exactamente divisible por alguno de los precios, usamos ese
-                if user.monto_credito % precio_adulto == 0:
-                    user_dict['numero_personas'] = user.monto_credito // precio_adulto
-                elif user.monto_credito % precio_nino == 0:
-                    user_dict['numero_personas'] = user.monto_credito // precio_nino
-                else:
-                    # Si no es exacto, usamos el precio promedio para estimar
-                    user_dict['numero_personas'] = round(user.monto_credito / precio_promedio)
+                # Mismo enfoque: buscar combinación exacta primero
+                encontrado = False
                 
+                for num_adultos in range(6):
+                    for num_ninos in range(6 - num_adultos):
+                        if num_adultos + num_ninos > 0:
+                            total_calculado = (num_adultos * precio_adulto) + (num_ninos * precio_nino)
+                            if total_calculado == user.monto_credito:
+                                user_dict['numero_personas'] = num_adultos + num_ninos
+                                encontrado = True
+                                break
+                    if encontrado:
+                        break
+                
+                if not encontrado:
+                    if user.monto_credito % precio_adulto == 0:
+                        user_dict['numero_personas'] = user.monto_credito // precio_adulto
+                    elif user.monto_credito % precio_nino == 0:
+                        user_dict['numero_personas'] = user.monto_credito // precio_nino
+                    else:
+                        mejor_diferencia = float('inf')
+                        mejor_personas = 1
+                        
+                        for num_personas in range(1, 6):  # Máximo 5 personas
+                            for num_adultos in range(num_personas + 1):
+                                num_ninos = num_personas - num_adultos
+                                total = (num_adultos * precio_adulto) + (num_ninos * precio_nino)
+                                diferencia = abs(total - user.monto_credito)
+                                
+                                if diferencia < mejor_diferencia:
+                                    mejor_diferencia = diferencia
+                                    mejor_personas = num_personas
+                        
+                        user_dict['numero_personas'] = mejor_personas
+
             elif user.tipo == 'asesoria':
-                # Precios actualizados para asesoría
                 precio_adulto = 652000 - 100000  # 552,000
                 precio_nino = 388000 - 100000    # 288,000
-                precio_promedio = (precio_adulto + precio_nino) / 2  # 420,000
                 
-                # Estimamos usando precio promedio
-                user_dict['numero_personas'] = round(user.monto_credito / precio_promedio)
+                # Mismo enfoque
+                encontrado = False
                 
+                for num_adultos in range(21):
+                    for num_ninos in range(21 - num_adultos):
+                        if num_adultos + num_ninos > 0:
+                            total_calculado = (num_adultos * precio_adulto) + (num_ninos * precio_nino)
+                            if total_calculado == user.monto_credito:
+                                user_dict['numero_personas'] = num_adultos + num_ninos
+                                encontrado = True
+                                break
+                    if encontrado:
+                        break
+                
+                if not encontrado:
+                    if user.monto_credito % precio_adulto == 0:
+                        user_dict['numero_personas'] = user.monto_credito // precio_adulto
+                    elif user.monto_credito % precio_nino == 0:
+                        user_dict['numero_personas'] = user.monto_credito // precio_nino
+                    else:
+                        mejor_diferencia = float('inf')
+                        mejor_personas = 1
+                        
+                        for num_personas in range(1, 21):
+                            for num_adultos in range(num_personas + 1):
+                                num_ninos = num_personas - num_adultos
+                                total = (num_adultos * precio_adulto) + (num_ninos * precio_nino)
+                                diferencia = abs(total - user.monto_credito)
+                                
+                                if diferencia < mejor_diferencia:
+                                    mejor_diferencia = diferencia
+                                    mejor_personas = num_personas
+                        
+                        user_dict['numero_personas'] = mejor_personas
+
             elif user.tipo == 'asesoria+consular':
-                # Precio actualizado para asesoria+consular
+                # Este tipo tiene precio único por persona
                 precio_persona = 1432900 - 100000  # 1,332,900
-                user_dict['numero_personas'] = round(user.monto_credito / precio_persona)
                 
+                if user.monto_credito % precio_persona == 0:
+                    user_dict['numero_personas'] = user.monto_credito // precio_persona
+                else:
+                    # Buscar el número más cercano
+                    user_dict['numero_personas'] = round(user.monto_credito / precio_persona)
+
             else:
                 # Para otros tipos de crédito
                 user_dict['numero_personas'] = None
